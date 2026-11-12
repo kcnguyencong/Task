@@ -3,7 +3,6 @@ import {
   Search,
   Bell,
   Command,
-  ShieldCheck,
   Sparkles,
   Building2,
   LogOut
@@ -28,13 +27,9 @@ export const Header: React.FC = () => {
       <div className="flex items-center space-x-3">
         <div className="flex items-center space-x-2">
           <span className="w-2 h-2 rounded-full bg-emerald-500/80"></span>
-          <span className="text-xs font-semibold text-zinc-300">
-            Trang chủ <span className="text-zinc-600">·</span> <span className="text-zinc-200 font-bold">AI Workmate</span> <span className="text-[10px] text-zinc-400 font-normal">Cấp Xã</span>
+          <span className="text-xs font-bold text-zinc-200">
+            AI Workmate
           </span>
-        </div>
-        <div className="hidden md:flex items-center space-x-1.5 px-2 py-0.5 rounded-full bg-[#16161A] border border-[#23232A] text-[10px] text-zinc-400 font-medium">
-          <ShieldCheck className="w-3 h-3 text-emerald-500/80" />
-          <span>Bảo mật nội bộ máy cán bộ</span>
         </div>
 
         {/* Locality badge */}
