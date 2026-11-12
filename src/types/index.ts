@@ -128,3 +128,12 @@ export interface OrganizationInfo {
   position: string;      // "CHỦ TỊCH"
 }
 
+export interface UserProfile {
+  id: number;
+  username: string;
+  full_name: string;
+  role: string;
+  department: string;
+  commune_name: string;
+}
+

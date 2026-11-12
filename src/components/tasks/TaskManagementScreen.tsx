@@ -63,10 +63,13 @@ export const TaskManagementScreen: React.FC = () => {
   const {
     tasks,
     locality,
+    currentUser,
     setTab,
     setSelectedTask,
     searchQuery
   } = useStore();
+
+  const shortName = currentUser?.full_name?.trim().split(/\s+/).pop() || 'Minh';
 
   const [showWizardModal, setShowWizardModal] = useState<boolean>(false);
   const [showGuideModal, setShowGuideModal] = useState<boolean>(false);
@@ -110,10 +113,10 @@ export const TaskManagementScreen: React.FC = () => {
           <div className="flex items-center space-x-2 text-xs text-zinc-400 font-medium">
             <span>UBND {locality.communeName}</span>
             <span className="text-zinc-600">·</span>
-            <span>Phòng Văn hóa - Xã hội</span>
+            <span>{currentUser?.department || 'Phòng Văn hóa - Xã hội'}</span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight mt-1">
-            Chào buổi sáng, Đ/c Minh!
+            Chào buổi sáng, Đ/c {shortName}!
           </h1>
         </div>
 

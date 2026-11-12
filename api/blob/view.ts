@@ -1,7 +1,13 @@
 import { get, head } from '@vercel/blob';
+import { getSessionUser } from '../_lib/auth';
 
 export async function GET(request: Request): Promise<Response> {
   try {
+    const user = await getSessionUser(request);
+    if (!user) {
+      return Response.json({ error: 'Vui lòng đăng nhập để xem văn bản.' }, { status: 401 });
+    }
+
     const { searchParams } = new URL(request.url);
     const pathname = searchParams.get('pathname');
     const checkOnly = searchParams.get('check') === '1';

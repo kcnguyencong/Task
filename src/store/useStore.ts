@@ -1,8 +1,20 @@
 import { create } from 'zustand';
-import { Task, OfficialDocument, Indicator, CompletedReport, TaskType, TaskStatus, OrganizationInfo } from '../types';
+import { Task, OfficialDocument, Indicator, CompletedReport, TaskType, TaskStatus, OrganizationInfo, UserProfile } from '../types';
 import { aiService, cleanVietnameseAdministrativeText } from '../services/aiService';
+import {
+  fetchCurrentUser,
+  loginWithPassword,
+  registerAccount,
+  logoutSession,
+  fetchUserTasksFromDb,
+  saveTaskToDb,
+  deleteTaskFromDb,
+} from '../services/authService';
 
 interface AppState {
+  currentUser: UserProfile | null;
+  authChecked: boolean;
+  authLoading: boolean;
   currentTab: 'tasks' | 'workspace';
   tasks: Task[];
   selectedTaskId: string;
@@ -20,6 +32,12 @@ interface AppState {
   // Đơn vị hành chính cấp xã (Tùy biến theo địa phương của cán bộ)
   locality: OrganizationInfo;
   updateLocality: (info: Partial<OrganizationInfo>) => void;
+
+  // Auth Actions
+  checkAuthSession: () => Promise<void>;
+  login: (username: string, password: string) => Promise<string | null>;
+  register: (payload: { username: string; password: string; fullName: string; communeName?: string }) => Promise<string | null>;
+  logout: () => Promise<void>;
 
   // Actions
   setTab: (tab: 'tasks' | 'workspace') => void;
@@ -98,12 +116,13 @@ function loadInitialLocality(): OrganizationInfo {
   }
 }
 
-const initialTasks = loadInitialTasks();
-
 export const useStore = create<AppState>((set, get) => ({
+  currentUser: null,
+  authChecked: false,
+  authLoading: false,
   currentTab: 'tasks',
-  tasks: initialTasks,
-  selectedTaskId: initialTasks[0]?.id || '',
+  tasks: [],
+  selectedTaskId: '',
   documents: [],
   selectedDocId: null,
   indicators: [],
@@ -118,6 +137,80 @@ export const useStore = create<AppState>((set, get) => ({
   locality: loadInitialLocality(),
 
   updateLocality: (info) => set((state) => ({ locality: { ...state.locality, ...info } })),
+
+  checkAuthSession: async () => {
+    const user = await fetchCurrentUser();
+    if (!user) {
+      set({ currentUser: null, authChecked: true, tasks: [], selectedTaskId: '' });
+      return;
+    }
+
+    const dbTasks = await fetchUserTasksFromDb();
+    const resolvedTasks = dbTasks ?? loadInitialTasks();
+    set((state) => ({
+      currentUser: user,
+      authChecked: true,
+      tasks: resolvedTasks,
+      selectedTaskId: resolvedTasks[0]?.id || '',
+      locality: { ...state.locality, communeName: user.commune_name || state.locality.communeName },
+    }));
+  },
+
+  login: async (username, password) => {
+    set({ authLoading: true });
+    const res = await loginWithPassword(username, password);
+    if (!res.user) {
+      set({ authLoading: false });
+      return res.error || 'Đăng nhập thất bại.';
+    }
+
+    const dbTasks = await fetchUserTasksFromDb();
+    const resolvedTasks = dbTasks ?? loadInitialTasks();
+    set((state) => ({
+      currentUser: res.user!,
+      authChecked: true,
+      authLoading: false,
+      currentTab: 'tasks',
+      tasks: resolvedTasks,
+      selectedTaskId: resolvedTasks[0]?.id || '',
+      locality: { ...state.locality, communeName: res.user!.commune_name || state.locality.communeName },
+    }));
+    get().showNotification(`Xin chào Đ/c ${res.user.full_name}!`);
+    return null;
+  },
+
+  register: async (payload) => {
+    set({ authLoading: true });
+    const res = await registerAccount(payload);
+    if (!res.user) {
+      set({ authLoading: false });
+      return res.error || 'Đăng ký thất bại.';
+    }
+
+    const dbTasks = await fetchUserTasksFromDb();
+    const resolvedTasks = dbTasks ?? [];
+    set((state) => ({
+      currentUser: res.user!,
+      authChecked: true,
+      authLoading: false,
+      currentTab: 'tasks',
+      tasks: resolvedTasks,
+      selectedTaskId: resolvedTasks[0]?.id || '',
+      locality: { ...state.locality, communeName: res.user!.commune_name || state.locality.communeName },
+    }));
+    get().showNotification(`Đã tạo tài khoản cho Đ/c ${res.user.full_name}!`);
+    return null;
+  },
+
+  logout: async () => {
+    await logoutSession();
+    set({
+      currentUser: null,
+      currentTab: 'tasks',
+      tasks: [],
+      selectedTaskId: '',
+    });
+  },
 
   setTab: (tab) => set({ currentTab: tab }),
 
@@ -248,6 +341,10 @@ export const useStore = create<AppState>((set, get) => ({
       currentTab: 'workspace'
     }));
 
+    if (get().currentUser) {
+      void saveTaskToDb(newTask);
+    }
+
     get().showNotification(`Đã khởi tạo công việc "${newTask.title}"!`);
     return newTask;
   },
@@ -260,6 +357,8 @@ export const useStore = create<AppState>((set, get) => ({
         return { ...t, status, progress };
       })
     }));
+    const updated = get().tasks.find(t => t.id === taskId);
+    if (updated && get().currentUser) void saveTaskToDb(updated);
     get().showNotification(`Đã chuyển trạng thái công việc sang "${
       status === 'completed' ? 'Đã hoàn thành & Lưu kho' :
       status === 'in_progress' ? 'Đang triển khai' :
@@ -271,6 +370,8 @@ export const useStore = create<AppState>((set, get) => ({
     set(state => ({
       tasks: state.tasks.map(t => (t.id === taskId ? { ...t, deadline } : t))
     }));
+    const updated = get().tasks.find(t => t.id === taskId);
+    if (updated && get().currentUser) void saveTaskToDb(updated);
     get().showNotification(`Đã cập nhật hạn thực hiện: ${deadline}`);
   },
 
@@ -285,6 +386,8 @@ export const useStore = create<AppState>((set, get) => ({
         return { ...t, checklist: newChecklist, progress, status: nextStatus };
       })
     }));
+    const updated = get().tasks.find(t => t.id === taskId);
+    if (updated && get().currentUser) void saveTaskToDb(updated);
   },
 
   addChecklistItem: (taskId, label) => {
@@ -299,6 +402,8 @@ export const useStore = create<AppState>((set, get) => ({
         return { ...t, checklist: newChecklist, progress, status: progress === 100 ? 'completed' : 'in_progress' };
       })
     }));
+    const updated = get().tasks.find(t => t.id === taskId);
+    if (updated && get().currentUser) void saveTaskToDb(updated);
   },
 
   removeChecklistItem: (taskId, checklistId) => {
@@ -311,6 +416,8 @@ export const useStore = create<AppState>((set, get) => ({
         return { ...t, checklist: newChecklist, progress };
       })
     }));
+    const updated = get().tasks.find(t => t.id === taskId);
+    if (updated && get().currentUser) void saveTaskToDb(updated);
   },
 
   updateSectionContent: (taskId, sectionId, content) => {
@@ -471,6 +578,8 @@ export const useStore = create<AppState>((set, get) => ({
       };
     });
 
+      const updated = get().tasks.find(t => t.id === taskId);
+      if (updated && get().currentUser) void saveTaskToDb(updated);
     get().showNotification('Chúc mừng! Báo cáo đã hoàn thành và lưu vào Kho tri thức.');
   },
 
@@ -570,6 +679,7 @@ export const useStore = create<AppState>((set, get) => ({
         selectedTaskId: state.selectedTaskId === taskId ? (remaining[0]?.id || '') : state.selectedTaskId
       };
     });
+    if (get().currentUser) void deleteTaskFromDb(taskId);
     get().showNotification('Đã xóa công việc.');
   },
 
@@ -620,21 +730,24 @@ export const useStore = create<AppState>((set, get) => ({
       selectedTaskId: task.id,
       currentTab: 'workspace'
     }));
+    if (get().currentUser) void saveTaskToDb(task);
     get().showNotification(`Đã tạo mới công việc: ${task.title}`);
   }
 }));
 
-// Tự động lưu tasks (loại bỏ blob: URL tạm trong RAM, giữ nguyên blobPathname để lấy Signed URL khi tải lại trang)
+// Tự động lưu cache cục bộ theo từng user (loại bỏ blob: URL tạm trong RAM)
 useStore.subscribe((state) => {
   try {
-    const serializableTasks = state.tasks.map((t) => ({
-      ...t,
-      originalDoc: {
-        ...t.originalDoc,
-        fileUrl: t.originalDoc.fileUrl?.startsWith('blob:') ? undefined : t.originalDoc.fileUrl,
-      },
-    }));
-    localStorage.setItem(TASKS_STORAGE_KEY, JSON.stringify(serializableTasks));
+    if (state.currentUser) {
+      const serializableTasks = state.tasks.map((t) => ({
+        ...t,
+        originalDoc: {
+          ...t.originalDoc,
+          fileUrl: t.originalDoc.fileUrl?.startsWith('blob:') ? undefined : t.originalDoc.fileUrl,
+        },
+      }));
+      localStorage.setItem(TASKS_STORAGE_KEY, JSON.stringify(serializableTasks));
+    }
     localStorage.setItem(LOCALITY_STORAGE_KEY, JSON.stringify(state.locality));
   } catch {
     // Bỏ qua nếu vượt dung lượng localStorage
