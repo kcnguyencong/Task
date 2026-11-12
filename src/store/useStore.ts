@@ -54,9 +54,41 @@ interface AppState {
   addNewTask: (newTask: Partial<Task>) => void;
 }
 
+const TASKS_STORAGE_KEY = 'ai_workmate_tasks_v1';
+const LOCALITY_STORAGE_KEY = 'ai_workmate_locality_v1';
+
+const DEFAULT_LOCALITY: OrganizationInfo = {
+  communeName: 'Xã Dị Sử',
+  districtName: 'Huyện Mỹ Hào',
+  provinceName: 'Tỉnh Hưng Yên',
+  chairmanName: 'Đào Văn Hùng',
+  position: 'CHỦ TỊCH'
+};
+
+function loadInitialTasks(): Task[] {
+  try {
+    const raw = localStorage.getItem(TASKS_STORAGE_KEY);
+    if (!raw) return INITIAL_TASKS;
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) && parsed.length > 0 ? parsed : INITIAL_TASKS;
+  } catch {
+    return INITIAL_TASKS;
+  }
+}
+
+function loadInitialLocality(): OrganizationInfo {
+  try {
+    const raw = localStorage.getItem(LOCALITY_STORAGE_KEY);
+    if (!raw) return DEFAULT_LOCALITY;
+    return { ...DEFAULT_LOCALITY, ...JSON.parse(raw) };
+  } catch {
+    return DEFAULT_LOCALITY;
+  }
+}
+
 export const useStore = create<AppState>((set, get) => ({
   currentTab: 'tasks',
-  tasks: INITIAL_TASKS,
+  tasks: loadInitialTasks(),
   selectedTaskId: 'task-1',
   documents: SAMPLE_DOCUMENTS,
   selectedDocId: 'doc-142',
@@ -69,13 +101,7 @@ export const useStore = create<AppState>((set, get) => ({
   taskFilterType: 'all',
   taskFilterStatus: 'all',
 
-  locality: {
-    communeName: 'Xã Dị Sử',
-    districtName: 'Huyện Mỹ Hào',
-    provinceName: 'Tỉnh Hưng Yên',
-    chairmanName: 'Đào Văn Hùng',
-    position: 'CHỦ TỊCH'
-  },
+  locality: loadInitialLocality(),
 
   updateLocality: (info) => set((state) => ({ locality: { ...state.locality, ...info } })),
 
@@ -193,7 +219,8 @@ export const useStore = create<AppState>((set, get) => ({
         fullContent: originalDoc.fullContent || cleanExcerpt,
         fileName: originalDoc.fileName,
         fileUrl: originalDoc.fileUrl,
-        fileType: originalDoc.fileType
+        fileType: originalDoc.fileType,
+        blobPathname: originalDoc.blobPathname
       },
       checklist: derivedChecklist,
       missingIndicators: [],
@@ -578,3 +605,20 @@ export const useStore = create<AppState>((set, get) => ({
     get().showNotification(`Đã tạo mới công việc: ${task.title}`);
   }
 }));
+
+// Tự động lưu tasks (loại bỏ blob: URL tạm trong RAM, giữ nguyên blobPathname để lấy Signed URL khi tải lại trang)
+useStore.subscribe((state) => {
+  try {
+    const serializableTasks = state.tasks.map((t) => ({
+      ...t,
+      originalDoc: {
+        ...t.originalDoc,
+        fileUrl: t.originalDoc.fileUrl?.startsWith('blob:') ? undefined : t.originalDoc.fileUrl,
+      },
+    }));
+    localStorage.setItem(TASKS_STORAGE_KEY, JSON.stringify(serializableTasks));
+    localStorage.setItem(LOCALITY_STORAGE_KEY, JSON.stringify(state.locality));
+  } catch {
+    // Bỏ qua nếu vượt dung lượng localStorage
+  }
+});

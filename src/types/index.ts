@@ -55,6 +55,7 @@ export interface Task {
     fileName?: string;
     fileUrl?: string;
     fileType?: string;
+    blobPathname?: string;
   };
   checklist: ChecklistItem[];
   missingIndicators: MissingIndicator[];
@@ -85,6 +86,7 @@ export interface OfficialDocument {
   fileName?: string;
   fileUrl?: string;
   fileType?: string;
+  blobPathname?: string;
   tasks: Partial<Task>[];
   requiredFiles: string[];
   actionPlan: { step: number; title: string; desc: string; role?: string }[];

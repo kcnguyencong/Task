@@ -13,6 +13,7 @@ import {
 import confetti from 'canvas-confetti';
 import { useStore } from '../../store/useStore';
 import { fixVietnameseOcrText } from '../../services/aiService';
+import { getSignedDocumentViewUrl } from '../../services/blobService';
 
 function viDateToIso(viDate: string): string {
   const parts = viDate.split('/');
@@ -48,12 +49,41 @@ export const AIWorkspaceScreen: React.FC = () => {
   const [deadlineInput, setDeadlineInput] = useState<string>(currentTask?.deadline || '');
   const [newTaskItem, setNewTaskItem] = useState<string>('');
   const [docViewMode, setDocViewMode] = useState<'pdf' | 'text'>('pdf');
+  const [resolvedPdfUrl, setResolvedPdfUrl] = useState<string | null>(null);
 
   useEffect(() => {
+    let cancelled = false;
+
     if (currentTask) {
       setDeadlineInput(currentTask.deadline);
-      setDocViewMode(currentTask.originalDoc.fileUrl ? 'pdf' : 'text');
+      const isPdf =
+        currentTask.originalDoc.fileType === 'pdf' ||
+        currentTask.originalDoc.fileName?.toLowerCase().endsWith('.pdf');
+
+      if (currentTask.originalDoc.fileUrl) {
+        setResolvedPdfUrl(currentTask.originalDoc.fileUrl);
+        setDocViewMode('pdf');
+      } else if (isPdf && currentTask.originalDoc.blobPathname) {
+        setResolvedPdfUrl(null);
+        setDocViewMode('pdf');
+        getSignedDocumentViewUrl(currentTask.originalDoc.blobPathname).then((signedUrl) => {
+          if (!cancelled) {
+            if (signedUrl) {
+              setResolvedPdfUrl(signedUrl);
+            } else {
+              setDocViewMode('text');
+            }
+          }
+        });
+      } else {
+        setResolvedPdfUrl(null);
+        setDocViewMode('text');
+      }
     }
+
+    return () => {
+      cancelled = true;
+    };
   }, [currentTask?.id]);
 
   if (!currentTask) {
@@ -382,7 +412,7 @@ export const AIWorkspaceScreen: React.FC = () => {
               </div>
             </div>
 
-            {currentTask.originalDoc.fileUrl && (
+            {resolvedPdfUrl && (
               <div className="flex items-center bg-[#18181f] border border-[#282834] p-0.5 rounded-lg text-[11px] shrink-0">
                 <button
                   type="button"
@@ -409,9 +439,9 @@ export const AIWorkspaceScreen: React.FC = () => {
 
           {/* Document Body */}
           <div className="flex-1 overflow-y-auto p-5 sm:p-6">
-            {currentTask.originalDoc.fileUrl && docViewMode === 'pdf' ? (
+            {resolvedPdfUrl && docViewMode === 'pdf' ? (
               <iframe
-                src={currentTask.originalDoc.fileUrl}
+                src={resolvedPdfUrl}
                 title={currentTask.originalDoc.fileName || 'Văn bản đã tải lên'}
                 className="w-full h-full min-h-[75vh] rounded-xl border border-[#262630] bg-white"
               />

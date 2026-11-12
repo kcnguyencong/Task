@@ -15,6 +15,7 @@ import {
 import { useStore } from '../../store/useStore';
 import { OfficialDocument, TaskType, Task } from '../../types';
 import { extractTextFromFile } from '../../services/fileParser';
+import { uploadDocumentToBlob } from '../../services/blobService';
 
 interface CreateTaskWizardModalProps {
   isOpen?: boolean;
@@ -114,10 +115,15 @@ export const CreateTaskWizardModal: React.FC<CreateTaskWizardModalProps> = ({ is
     }
 
     try {
-      const doc = await runAnalyzeDocument(query, fileName);
+      const [doc, blobOutcome] = await Promise.all([
+        runAnalyzeDocument(query, fileName),
+        uploadDocumentToBlob(uploadedFile),
+      ]);
+
       const isPdf = uploadedFile.type === 'application/pdf' || fileName.toLowerCase().endsWith('.pdf');
       doc.fileName = fileName;
       doc.fileType = isPdf ? 'pdf' : fileName.split('.').pop()?.toLowerCase() || 'txt';
+      doc.blobPathname = blobOutcome.blobPathname;
       if (isPdf) {
         doc.fileUrl = URL.createObjectURL(uploadedFile);
       }
@@ -141,7 +147,10 @@ export const CreateTaskWizardModal: React.FC<CreateTaskWizardModalProps> = ({ is
         }
 
         setIsAnalyzing(false);
-      }, 1400);
+        if (blobOutcome.storage === 'vercel_blob') {
+          showNotification('Đã tải văn bản lên Vercel Blob (Private) & phân tích xong!');
+        }
+      }, 1000);
     } catch {
       setIsAnalyzing(false);
       showNotification('Lỗi khi phân tích văn bản');
