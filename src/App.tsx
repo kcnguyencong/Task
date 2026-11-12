@@ -5,6 +5,7 @@ import { Header } from './components/layout/Header';
 import { Sidebar } from './components/layout/Sidebar';
 import { TaskManagementScreen } from './components/tasks/TaskManagementScreen';
 import { AIWorkspaceScreen } from './components/workspace/AIWorkspaceScreen';
+import { StatsScreen } from './components/stats/StatsScreen';
 import { LoginScreen } from './components/auth/LoginScreen';
 import { SettingsModal } from './components/settings/SettingsModal';
 
@@ -40,6 +41,8 @@ export const App: React.FC = () => {
         <main className="flex-1 overflow-y-auto">
           {currentTab === 'workspace' ? (
             <AIWorkspaceScreen />
+          ) : currentTab === 'stats' ? (
+            <StatsScreen />
           ) : (
             <TaskManagementScreen />
           )}

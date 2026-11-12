@@ -15,7 +15,7 @@ interface AppState {
   currentUser: UserProfile | null;
   authChecked: boolean;
   authLoading: boolean;
-  currentTab: 'tasks' | 'workspace';
+  currentTab: 'tasks' | 'workspace' | 'stats';
   tasks: Task[];
   selectedTaskId: string;
   documents: OfficialDocument[];
@@ -42,7 +42,7 @@ interface AppState {
   logout: () => Promise<void>;
 
   // Actions
-  setTab: (tab: 'tasks' | 'workspace') => void;
+  setTab: (tab: 'tasks' | 'workspace' | 'stats') => void;
   setSelectedTask: (taskId: string) => void;
   setSelectedDoc: (docId: string | null) => void;
   setSearchQuery: (query: string) => void;
@@ -348,7 +348,11 @@ export const useStore = create<AppState>((set, get) => ({
       tasks: state.tasks.map(t => {
         if (t.id !== taskId) return t;
         const progress = status === 'completed' ? 100 : t.progress;
-        return { ...t, status, progress };
+        const completedAt =
+          status === 'completed'
+            ? t.completedAt || new Date().toLocaleDateString('vi-VN')
+            : undefined;
+        return { ...t, status, progress, completedAt };
       })
     }));
     const updated = get().tasks.find(t => t.id === taskId);
@@ -377,7 +381,11 @@ export const useStore = create<AppState>((set, get) => ({
         const completedCount = newChecklist.filter(c => c.status === 'completed').length;
         const progress = newChecklist.length > 0 ? Math.round((completedCount / newChecklist.length) * 100) : 0;
         const nextStatus = progress === 100 ? ('completed' as const) : ('in_progress' as const);
-        return { ...t, checklist: newChecklist, progress, status: nextStatus };
+        const completedAt =
+          nextStatus === 'completed'
+            ? t.completedAt || new Date().toLocaleDateString('vi-VN')
+            : undefined;
+        return { ...t, checklist: newChecklist, progress, status: nextStatus, completedAt };
       })
     }));
     const updated = get().tasks.find(t => t.id === taskId);

@@ -3,7 +3,7 @@ import {
   Home,
   CheckSquare,
   Sparkles,
-  FileText,
+  BarChart3,
   Database,
   Archive,
   ShieldCheck,
@@ -52,14 +52,11 @@ export const Sidebar: React.FC = () => {
       onClick: () => setTab('workspace')
     },
     {
-      id: 'interpreter',
-      label: 'Văn bản',
-      icon: FileText,
-      active: false,
-      onClick: () => {
-        setTaskFilterStatus('all');
-        setTab('tasks');
-      }
+      id: 'stats',
+      label: 'Thống kê',
+      icon: BarChart3,
+      active: currentTab === 'stats',
+      onClick: () => setTab('stats')
     },
     {
       id: 'knowledge',
