@@ -1,6 +1,5 @@
 import { create } from 'zustand';
 import { Task, OfficialDocument, Indicator, CompletedReport, TaskType, TaskStatus, OrganizationInfo } from '../types';
-import { INITIAL_TASKS, SAMPLE_DOCUMENTS, INITIAL_INDICATORS, INITIAL_COMPLETED_REPORTS } from '../data/mockData';
 import { aiService, cleanVietnameseAdministrativeText } from '../services/aiService';
 
 interface AppState {
@@ -54,8 +53,10 @@ interface AppState {
   addNewTask: (newTask: Partial<Task>) => void;
 }
 
-const TASKS_STORAGE_KEY = 'ai_workmate_tasks_v1';
+const TASKS_STORAGE_KEY = 'ai_workmate_tasks_v2';
+const LEGACY_TASKS_STORAGE_KEY = 'ai_workmate_tasks_v1';
 const LOCALITY_STORAGE_KEY = 'ai_workmate_locality_v1';
+const MOCK_TASK_IDS = new Set(['task-1', 'task-2', 'task-3', 'task-4', 'task-5']);
 
 const DEFAULT_LOCALITY: OrganizationInfo = {
   communeName: 'Xã Dị Sử',
@@ -67,12 +68,23 @@ const DEFAULT_LOCALITY: OrganizationInfo = {
 
 function loadInitialTasks(): Task[] {
   try {
-    const raw = localStorage.getItem(TASKS_STORAGE_KEY);
-    if (!raw) return INITIAL_TASKS;
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) && parsed.length > 0 ? parsed : INITIAL_TASKS;
+    const rawV2 = localStorage.getItem(TASKS_STORAGE_KEY);
+    if (rawV2) {
+      const parsed = JSON.parse(rawV2);
+      return Array.isArray(parsed) ? parsed : [];
+    }
+
+    // Di chuyển dữ liệu thật từ v1 nếu có và loại bỏ toàn bộ dữ liệu mock cũ
+    const rawV1 = localStorage.getItem(LEGACY_TASKS_STORAGE_KEY);
+    if (rawV1) {
+      const parsed = JSON.parse(rawV1);
+      if (Array.isArray(parsed)) {
+        return parsed.filter((t: Task) => t && !MOCK_TASK_IDS.has(t.id));
+      }
+    }
+    return [];
   } catch {
-    return INITIAL_TASKS;
+    return [];
   }
 }
 
@@ -86,14 +98,16 @@ function loadInitialLocality(): OrganizationInfo {
   }
 }
 
+const initialTasks = loadInitialTasks();
+
 export const useStore = create<AppState>((set, get) => ({
   currentTab: 'tasks',
-  tasks: loadInitialTasks(),
-  selectedTaskId: 'task-1',
-  documents: SAMPLE_DOCUMENTS,
-  selectedDocId: 'doc-142',
-  indicators: INITIAL_INDICATORS,
-  completedReports: INITIAL_COMPLETED_REPORTS,
+  tasks: initialTasks,
+  selectedTaskId: initialTasks[0]?.id || '',
+  documents: [],
+  selectedDocId: null,
+  indicators: [],
+  completedReports: [],
   isAnalyzing: false,
   analyzedDoc: null,
   searchQuery: '',
@@ -549,9 +563,13 @@ export const useStore = create<AppState>((set, get) => ({
   },
 
   deleteTask: (taskId) => {
-    set(state => ({
-      tasks: state.tasks.filter(t => t.id !== taskId)
-    }));
+    set(state => {
+      const remaining = state.tasks.filter(t => t.id !== taskId);
+      return {
+        tasks: remaining,
+        selectedTaskId: state.selectedTaskId === taskId ? (remaining[0]?.id || '') : state.selectedTaskId
+      };
+    });
     get().showNotification('Đã xóa công việc.');
   },
 
@@ -572,7 +590,7 @@ export const useStore = create<AppState>((set, get) => ({
         id: 'manual-doc',
         code: 'Giao việc trực tiếp',
         title: 'Nhiệm vụ do Lãnh đạo UBND giao',
-        issuedBy: 'UBND Xã Tân Triều',
+        issuedBy: `UBND ${get().locality.communeName}`,
         date: new Date().toLocaleDateString('vi-VN'),
         excerpt: 'Chỉ đạo trực tiếp của Thường trực UBND xã.'
       },

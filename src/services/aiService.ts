@@ -1,5 +1,4 @@
 import { OfficialDocument, Task, ReportSection, MissingIndicator, TaskType, ExecutiveBriefing } from '../types';
-import { SAMPLE_DOCUMENTS } from '../data/mockData';
 
 export interface AIValidationResult {
   isComplete: boolean;
@@ -88,14 +87,6 @@ export class AIService {
   async analyzeDocument(docIdOrText: string, fileName?: string): Promise<OfficialDocument> {
     // Giả lập độ trễ AI xử lý tự nhiên (600ms)
     await new Promise(resolve => setTimeout(resolve, 600));
-
-    // 1. Kiểm tra nếu khớp với các văn bản mẫu có sẵn
-    const matched = SAMPLE_DOCUMENTS.find(
-      d => d.id === docIdOrText || d.code.toLowerCase().includes(docIdOrText.toLowerCase())
-    );
-    if (matched) {
-      return JSON.parse(JSON.stringify(matched));
-    }
 
     // Làm sạch toàn diện văn bản đầu vào (giữ nguyên toàn văn bản sạch cho cột xem văn bản gốc)
     const rawContent = docIdOrText.trim();

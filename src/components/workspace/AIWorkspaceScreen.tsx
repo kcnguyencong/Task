@@ -88,8 +88,17 @@ export const AIWorkspaceScreen: React.FC = () => {
 
   if (!currentTask) {
     return (
-      <div className="p-16 text-center text-zinc-500 font-medium">
-        Không tìm thấy công việc được chọn. Vui lòng quay lại trang chủ.
+      <div className="p-16 text-center space-y-3">
+        <p className="text-zinc-400 font-medium text-sm">
+          Chưa có công việc nào được chọn. Vui lòng quay lại trang chủ để tạo hoặc chọn công việc.
+        </p>
+        <button
+          onClick={() => setTab('tasks')}
+          className="inline-flex items-center space-x-1.5 px-4 py-2 bg-[#C59B27] hover:bg-[#D4AF37] text-slate-950 font-bold rounded-xl text-xs cursor-pointer"
+        >
+          <ArrowLeft className="w-3.5 h-3.5" />
+          <span>Quay lại danh sách công việc</span>
+        </button>
       </div>
     );
   }

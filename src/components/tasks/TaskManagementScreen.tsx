@@ -23,6 +23,10 @@ function parseViDate(dateStr: string): number {
 }
 
 function getPriorityTask(tasks: Task[]): { task: Task | undefined; reason: string } {
+  if (tasks.length === 0) {
+    return { task: undefined, reason: 'Chưa có công việc nào' };
+  }
+
   const active = tasks.filter(t => t.status !== 'completed');
   if (active.length === 0) {
     return { task: undefined, reason: 'Đã hoàn thành toàn bộ công việc hiện có' };
@@ -217,6 +221,14 @@ export const TaskManagementScreen: React.FC = () => {
                 </button>
               </div>
             </>
+          ) : tasks.length === 0 ? (
+            <div className="flex flex-col items-center justify-center text-center py-6 space-y-2.5">
+              <FileText className="w-8 h-8 text-[#E5B54F]/80" />
+              <h2 className="text-base font-bold text-white">Chưa có công việc nào</h2>
+              <p className="text-xs text-zinc-400 max-w-xs">
+                Hãy tải văn bản chỉ đạo hoặc tạo công việc mới ở bên trái để bắt đầu xử lý.
+              </p>
+            </div>
           ) : (
             <div className="flex flex-col items-center justify-center text-center py-6 space-y-2">
               <CheckCircle2 className="w-8 h-8 text-emerald-400" />
@@ -271,16 +283,33 @@ export const TaskManagementScreen: React.FC = () => {
         {/* Full-width Task rows */}
         <div className="space-y-2.5">
           {filteredTasks.length === 0 ? (
-            <div className="bg-[#131316] border border-[#202026] rounded-xl p-6 text-center space-y-2">
-              <p className="text-xs font-semibold text-zinc-300">
-                Không có công việc nào khớp với bộ lọc hiện tại.
-              </p>
-              <button
-                onClick={() => setStatusFilter('all')}
-                className="text-[11px] font-bold text-[#E5B54F] hover:underline cursor-pointer"
-              >
-                Xem tất cả công việc
-              </button>
+            <div className="bg-[#131316] border border-[#202026] rounded-xl p-6 text-center space-y-2.5">
+              {tasks.length === 0 ? (
+                <>
+                  <p className="text-xs font-semibold text-zinc-300">
+                    Danh sách công việc hiện đang trống.
+                  </p>
+                  <button
+                    onClick={() => setShowWizardModal(true)}
+                    className="inline-flex items-center space-x-1.5 px-3.5 py-2 bg-[#C59B27] hover:bg-[#D4AF37] text-slate-950 rounded-lg text-xs font-bold transition-all cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Tạo công việc mới</span>
+                  </button>
+                </>
+              ) : (
+                <>
+                  <p className="text-xs font-semibold text-zinc-300">
+                    Không có công việc nào khớp với bộ lọc hiện tại.
+                  </p>
+                  <button
+                    onClick={() => setStatusFilter('all')}
+                    className="text-[11px] font-bold text-[#E5B54F] hover:underline cursor-pointer"
+                  >
+                    Xem tất cả công việc
+                  </button>
+                </>
+              )}
             </div>
           ) : (
             filteredTasks.map((task) => {
