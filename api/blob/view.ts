@@ -1,5 +1,5 @@
 import { get, head } from '@vercel/blob';
-import { getSessionUser } from '../_lib/auth';
+import { getSessionUser } from '../_lib/auth.js';
 
 export async function GET(request: Request): Promise<Response> {
   try {

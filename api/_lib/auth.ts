@@ -1,5 +1,5 @@
 import crypto from 'node:crypto';
-import { ensureSchema, getSql, type DbUser } from './db';
+import { ensureSchema, getSql, type DbUser } from './db.js';
 
 const SESSION_COOKIE_NAME = 'ai_workmate_session';
 const SESSION_MAX_AGE_SECONDS = 7 * 24 * 60 * 60; // 7 ngày

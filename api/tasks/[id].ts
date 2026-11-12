@@ -1,6 +1,6 @@
 import { del } from '@vercel/blob';
-import { ensureSchema, getSql } from '../_lib/db';
-import { getSessionUser } from '../_lib/auth';
+import { ensureSchema, getSql } from '../_lib/db.js';
+import { getSessionUser } from '../_lib/auth.js';
 
 export async function DELETE(request: Request): Promise<Response> {
   try {

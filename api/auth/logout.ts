@@ -1,4 +1,4 @@
-import { buildClearSessionCookie } from '../_lib/auth';
+import { buildClearSessionCookie } from '../_lib/auth.js';
 
 export async function POST(): Promise<Response> {
   return Response.json(

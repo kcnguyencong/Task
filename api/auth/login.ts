@@ -1,5 +1,5 @@
-import { ensureSchema, getSql, verifyPassword } from '../_lib/db';
-import { buildSessionCookie } from '../_lib/auth';
+import { ensureSchema, getSql, verifyPassword } from '../_lib/db.js';
+import { buildSessionCookie } from '../_lib/auth.js';
 
 interface LoginBody {
   username?: string;

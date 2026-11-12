@@ -1,6 +1,6 @@
 import { issueSignedToken } from '@vercel/blob';
 import { handleUploadPresigned, type HandleUploadPresignedBody } from '@vercel/blob/client';
-import { getSessionUser } from '../_lib/auth';
+import { getSessionUser } from '../_lib/auth.js';
 
 export async function POST(request: Request): Promise<Response> {
   const body = (await request.json()) as HandleUploadPresignedBody;

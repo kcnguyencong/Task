@@ -1,5 +1,5 @@
-import { ensureSchema } from '../_lib/db';
-import { getSessionUser } from '../_lib/auth';
+import { ensureSchema } from '../_lib/db.js';
+import { getSessionUser } from '../_lib/auth.js';
 
 export async function GET(request: Request): Promise<Response> {
   try {
