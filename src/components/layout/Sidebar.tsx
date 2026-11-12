@@ -2,7 +2,6 @@ import React from 'react';
 import {
   Home,
   CheckSquare,
-  Sparkles,
   BarChart3,
   Database,
   Archive,
@@ -43,13 +42,6 @@ export const Sidebar: React.FC = () => {
         setTaskFilterStatus('urgent');
         setTab('tasks');
       }
-    },
-    {
-      id: 'workspace',
-      label: 'Bàn việc',
-      icon: Sparkles,
-      active: currentTab === 'workspace',
-      onClick: () => setTab('workspace')
     },
     {
       id: 'stats',
