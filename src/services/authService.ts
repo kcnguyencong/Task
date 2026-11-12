@@ -37,29 +37,6 @@ export async function loginWithPassword(
   }
 }
 
-export async function registerAccount(payload: {
-  username: string;
-  password: string;
-  fullName: string;
-  communeName?: string;
-}): Promise<{ user?: UserProfile; error?: string }> {
-  try {
-    const res = await fetch('/api/auth/register', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify(payload),
-    });
-    const data = (await res.json()) as AuthResponse;
-    if (!res.ok || !data.user) {
-      return { error: data.error || 'Đăng ký tài khoản thất bại.' };
-    }
-    return { user: data.user };
-  } catch {
-    return { error: 'Không thể kết nối máy chủ đăng ký.' };
-  }
-}
-
 export async function logoutSession(): Promise<void> {
   try {
     await fetch('/api/auth/logout', {

@@ -4,7 +4,6 @@ import { aiService, cleanVietnameseAdministrativeText } from '../services/aiServ
 import {
   fetchCurrentUser,
   loginWithPassword,
-  registerAccount,
   logoutSession,
   updateUserProfileInDb,
   fetchUserTasksFromDb,
@@ -39,7 +38,6 @@ interface AppState {
   setShowSettingsModal: (open: boolean) => void;
   checkAuthSession: () => Promise<void>;
   login: (username: string, password: string) => Promise<string | null>;
-  register: (payload: { username: string; password: string; fullName: string; communeName?: string }) => Promise<string | null>;
   updateProfile: (payload: { fullName: string; communeName: string; department: string; role?: string }) => Promise<string | null>;
   logout: () => Promise<void>;
 
@@ -182,29 +180,6 @@ export const useStore = create<AppState>((set, get) => ({
       locality: { ...state.locality, communeName: res.user!.commune_name || state.locality.communeName },
     }));
     get().showNotification(`Xin chào Đ/c ${res.user.full_name}!`);
-    return null;
-  },
-
-  register: async (payload) => {
-    set({ authLoading: true });
-    const res = await registerAccount(payload);
-    if (!res.user) {
-      set({ authLoading: false });
-      return res.error || 'Đăng ký thất bại.';
-    }
-
-    const dbTasks = await fetchUserTasksFromDb();
-    const resolvedTasks = dbTasks ?? [];
-    set((state) => ({
-      currentUser: res.user!,
-      authChecked: true,
-      authLoading: false,
-      currentTab: 'tasks',
-      tasks: resolvedTasks,
-      selectedTaskId: resolvedTasks[0]?.id || '',
-      locality: { ...state.locality, communeName: res.user!.commune_name || state.locality.communeName },
-    }));
-    get().showNotification(`Đã tạo tài khoản cho Đ/c ${res.user.full_name}!`);
     return null;
   },
 

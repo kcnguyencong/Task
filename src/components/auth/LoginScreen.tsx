@@ -1,32 +1,19 @@
 import React, { useState } from 'react';
-import { ShieldCheck, LogIn, UserPlus, Lock, User, Building2, Loader2, AlertCircle } from 'lucide-react';
+import { ShieldCheck, LogIn, Lock, User, Loader2, AlertCircle } from 'lucide-react';
 import { useStore } from '../../store/useStore';
 
 export const LoginScreen: React.FC = () => {
-  const { login, register, authLoading } = useStore();
-  const [mode, setMode] = useState<'login' | 'register'>('login');
+  const { login, authLoading } = useStore();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [fullName, setFullName] = useState('');
-  const [communeName, setCommuneName] = useState('Xã Dị Sử');
   const [error, setError] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
-    if (mode === 'login') {
-      const err = await login(username.trim(), password);
-      if (err) setError(err);
-    } else {
-      const err = await register({
-        username: username.trim(),
-        password,
-        fullName: fullName.trim(),
-        communeName: communeName.trim() || 'Xã Dị Sử',
-      });
-      if (err) setError(err);
-    }
+    const err = await login(username.trim(), password);
+    if (err) setError(err);
   };
 
   return (
@@ -52,80 +39,13 @@ export const LoginScreen: React.FC = () => {
           </div>
         </div>
 
-        {/* Mode Switch */}
-        <div className="px-7 pt-5">
-          <div className="grid grid-cols-2 bg-[#0e0e12] border border-[#22222b] p-1 rounded-xl text-xs font-semibold">
-            <button
-              type="button"
-              onClick={() => {
-                setMode('login');
-                setError('');
-              }}
-              className={`py-2 rounded-lg transition-all cursor-pointer ${
-                mode === 'login'
-                  ? 'bg-[#C59B27] text-slate-950 font-bold'
-                  : 'text-zinc-400 hover:text-white'
-              }`}
-            >
-              Đăng nhập
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setMode('register');
-                setError('');
-              }}
-              className={`py-2 rounded-lg transition-all cursor-pointer ${
-                mode === 'register'
-                  ? 'bg-[#C59B27] text-slate-950 font-bold'
-                  : 'text-zinc-400 hover:text-white'
-              }`}
-            >
-              Đăng ký mới
-            </button>
-          </div>
-        </div>
-
         {/* Form */}
-        <form onSubmit={handleSubmit} className="p-7 pt-5 space-y-4">
+        <form onSubmit={handleSubmit} className="p-7 space-y-4">
           {error && (
             <div className="flex items-start gap-2 bg-red-950/40 border border-red-800/50 text-red-300 text-xs rounded-xl px-3.5 py-2.5">
               <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-red-400" />
               <span>{error}</span>
             </div>
-          )}
-
-          {mode === 'register' && (
-            <>
-              <div className="space-y-1.5">
-                <label className="block text-[11px] font-semibold text-zinc-300">Họ và tên cán bộ</label>
-                <div className="relative">
-                  <User className="w-3.5 h-3.5 text-zinc-500 absolute left-3 top-1/2 -translate-y-1/2" />
-                  <input
-                    type="text"
-                    required
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                    placeholder="Ví dụ: Nguyễn Văn A"
-                    className="w-full pl-9 pr-3 py-2.5 text-xs bg-[#0d0d11] border border-[#262630] rounded-xl text-white placeholder:text-zinc-600 focus:border-[#C59B27] focus:outline-none"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="block text-[11px] font-semibold text-zinc-300">Đơn vị (Xã / Phường)</label>
-                <div className="relative">
-                  <Building2 className="w-3.5 h-3.5 text-zinc-500 absolute left-3 top-1/2 -translate-y-1/2" />
-                  <input
-                    type="text"
-                    value={communeName}
-                    onChange={(e) => setCommuneName(e.target.value)}
-                    placeholder="Xã Dị Sử"
-                    className="w-full pl-9 pr-3 py-2.5 text-xs bg-[#0d0d11] border border-[#262630] rounded-xl text-white placeholder:text-zinc-600 focus:border-[#C59B27] focus:outline-none"
-                  />
-                </div>
-              </div>
-            </>
           )}
 
           <div className="space-y-1.5">
@@ -151,10 +71,10 @@ export const LoginScreen: React.FC = () => {
               <input
                 type="password"
                 required
-                autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+                autoComplete="current-password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="Nhập mật khẩu (tối thiểu 6 ký tự)"
+                placeholder="Nhập mật khẩu"
                 className="w-full pl-9 pr-3 py-2.5 text-xs bg-[#0d0d11] border border-[#262630] rounded-xl text-white placeholder:text-zinc-600 focus:border-[#C59B27] focus:outline-none"
               />
             </div>
@@ -170,15 +90,10 @@ export const LoginScreen: React.FC = () => {
                 <Loader2 className="w-4 h-4 animate-spin" />
                 <span>Đang xử lý...</span>
               </>
-            ) : mode === 'login' ? (
+            ) : (
               <>
                 <LogIn className="w-4 h-4" />
                 <span>Đăng nhập hệ thống</span>
-              </>
-            ) : (
-              <>
-                <UserPlus className="w-4 h-4" />
-                <span>Tạo tài khoản & Đăng nhập</span>
               </>
             )}
           </button>
