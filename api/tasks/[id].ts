@@ -1,3 +1,4 @@
+import { del } from '@vercel/blob';
 import { ensureSchema, getSql } from '../_lib/db';
 import { getSessionUser } from '../_lib/auth';
 
@@ -18,10 +19,30 @@ export async function DELETE(request: Request): Promise<Response> {
 
     await ensureSchema();
     const sql = getSql();
+
+    const rows = await sql`
+      SELECT data
+      FROM tasks
+      WHERE id = ${id} AND user_id = ${user.id}
+      LIMIT 1
+    `;
+
+    const blobPathname = (
+      rows[0]?.data as { originalDoc?: { blobPathname?: string } } | undefined
+    )?.originalDoc?.blobPathname;
+
     await sql`
       DELETE FROM tasks
       WHERE id = ${id} AND user_id = ${user.id}
     `;
+
+    if (blobPathname) {
+      try {
+        await del(blobPathname);
+      } catch (blobErr) {
+        console.warn('Không thể xóa tệp đính kèm trên Vercel Blob:', blobErr);
+      }
+    }
 
     return Response.json({ ok: true });
   } catch (error) {

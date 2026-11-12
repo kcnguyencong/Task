@@ -9,7 +9,8 @@ import {
   Flame,
   Calendar,
   Clock,
-  BookOpen
+  BookOpen,
+  Trash2
 } from 'lucide-react';
 import { useStore } from '../../store/useStore';
 import { Task } from '../../types';
@@ -66,6 +67,7 @@ export const TaskManagementScreen: React.FC = () => {
     currentUser,
     setTab,
     setSelectedTask,
+    deleteTask,
     searchQuery
   } = useStore();
 
@@ -73,6 +75,7 @@ export const TaskManagementScreen: React.FC = () => {
 
   const [showWizardModal, setShowWizardModal] = useState<boolean>(false);
   const [showGuideModal, setShowGuideModal] = useState<boolean>(false);
+  const [taskToDelete, setTaskToDelete] = useState<Task | null>(null);
   const [statusFilter, setStatusFilter] = useState<'all' | 'urgent' | 'waiting_data' | 'completed'>('all');
 
   // Công việc ưu tiên số 1 dựa trên tiêu chí rõ ràng: Chưa xong -> Độ khẩn cao nhất -> Hạn nộp gần nhất
@@ -377,6 +380,18 @@ export const TaskManagementScreen: React.FC = () => {
                       </div>
                     </div>
 
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setTaskToDelete(task);
+                      }}
+                      className="p-2 text-zinc-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors cursor-pointer"
+                      title="Xóa công việc"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+
                     <button className="px-3.5 py-2 bg-[#1C1C22] group-hover:bg-[#C59B27] text-zinc-300 group-hover:text-slate-950 rounded-lg text-xs font-bold transition-all cursor-pointer">
                       Làm việc →
                     </button>
@@ -391,6 +406,48 @@ export const TaskManagementScreen: React.FC = () => {
       {/* MODAL: Wizard Khởi tạo việc từ văn bản */}
       {showWizardModal && (
         <CreateTaskWizardModal onClose={() => setShowWizardModal(false)} />
+      )}
+
+      {/* MODAL: Xác nhận xóa công việc */}
+      {taskToDelete && (
+        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-[#151518] border border-[#282832] rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-start gap-3">
+              <div className="w-9 h-9 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 flex items-center justify-center shrink-0">
+                <Trash2 className="w-4 h-4" />
+              </div>
+              <div className="space-y-1 min-w-0">
+                <h3 className="text-sm font-bold text-white">Xác nhận xóa công việc?</h3>
+                <p className="text-xs text-zinc-300 font-medium break-words">
+                  {taskToDelete.title}
+                </p>
+                <p className="text-[11px] text-zinc-500">
+                  Công việc và văn bản đính kèm (nếu có trên hệ thống) sẽ bị xóa vĩnh viễn.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-[#222228]">
+              <button
+                type="button"
+                onClick={() => setTaskToDelete(null)}
+                className="px-4 py-2 text-xs font-semibold text-zinc-300 hover:text-white bg-[#1e1e26] hover:bg-[#272732] rounded-xl transition-colors cursor-pointer"
+              >
+                Hủy
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  deleteTask(taskToDelete.id);
+                  setTaskToDelete(null);
+                }}
+                className="px-4 py-2 bg-red-600 hover:bg-red-500 text-white font-bold rounded-xl text-xs transition-colors cursor-pointer"
+              >
+                Xóa công việc
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* MODAL: Hướng dẫn 3 bước */}

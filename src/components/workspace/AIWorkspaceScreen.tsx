@@ -41,7 +41,8 @@ export const AIWorkspaceScreen: React.FC = () => {
     updateChecklistStatus,
     addChecklistItem,
     removeChecklistItem,
-    completeTaskAndArchive
+    completeTaskAndArchive,
+    deleteTask
   } = useStore();
 
   const currentTask = tasks.find(t => t.id === selectedTaskId) || tasks[0];
@@ -50,6 +51,7 @@ export const AIWorkspaceScreen: React.FC = () => {
   const [newTaskItem, setNewTaskItem] = useState<string>('');
   const [docViewMode, setDocViewMode] = useState<'pdf' | 'text'>('pdf');
   const [resolvedPdfUrl, setResolvedPdfUrl] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<boolean>(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -169,6 +171,16 @@ export const AIWorkspaceScreen: React.FC = () => {
         </div>
 
         <div className="flex items-center space-x-2.5 shrink-0">
+          <button
+            type="button"
+            onClick={() => setConfirmDelete(true)}
+            className="px-2.5 py-1.5 text-xs font-semibold text-zinc-400 hover:text-red-400 hover:bg-red-500/10 border border-transparent hover:border-red-500/20 rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer"
+            title="Xóa công việc này"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Xóa</span>
+          </button>
+
           {currentTask.status !== 'completed' ? (
             <button
               onClick={handleCompleteAndArchive}
@@ -469,6 +481,49 @@ export const AIWorkspaceScreen: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {confirmDelete && (
+        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-[#151518] border border-[#282832] rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-start gap-3">
+              <div className="w-9 h-9 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 flex items-center justify-center shrink-0">
+                <Trash2 className="w-4 h-4" />
+              </div>
+              <div className="space-y-1 min-w-0">
+                <h3 className="text-sm font-bold text-white">Xác nhận xóa công việc?</h3>
+                <p className="text-xs text-zinc-300 font-medium break-words">
+                  {currentTask.title}
+                </p>
+                <p className="text-[11px] text-zinc-500">
+                  Công việc và tệp văn bản đính kèm trên Vercel Blob sẽ bị xóa vĩnh viễn.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-[#222228]">
+              <button
+                type="button"
+                onClick={() => setConfirmDelete(false)}
+                className="px-4 py-2 text-xs font-semibold text-zinc-300 hover:text-white bg-[#1e1e26] hover:bg-[#272732] rounded-xl transition-colors cursor-pointer"
+              >
+                Hủy
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const idToDelete = currentTask.id;
+                  setConfirmDelete(false);
+                  deleteTask(idToDelete);
+                  setTab('tasks');
+                }}
+                className="px-4 py-2 bg-red-600 hover:bg-red-500 text-white font-bold rounded-xl text-xs transition-colors cursor-pointer"
+              >
+                Xóa công việc
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
