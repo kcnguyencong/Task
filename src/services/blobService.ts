@@ -1,4 +1,4 @@
-import { upload } from '@vercel/blob/client';
+import { uploadPresigned } from '@vercel/blob/client';
 
 export interface BlobUploadOutcome {
   blobPathname?: string;
@@ -14,7 +14,7 @@ function sanitizeFileName(name: string): string {
 }
 
 /**
- * Tải trực tiếp tệp công văn lên Vercel Blob (chế độ Private).
+ * Tải trực tiếp tệp công văn lên Vercel Blob (chế độ Private, xác thực OIDC + Presigned URL).
  * Nếu đang chạy Vite thuần (npm run dev) chưa có /api/blob/upload, tự động chuyển sang chế độ xem cục bộ.
  */
 export async function uploadDocumentToBlob(file: File): Promise<BlobUploadOutcome> {
@@ -22,7 +22,7 @@ export async function uploadDocumentToBlob(file: File): Promise<BlobUploadOutcom
   const pathname = `cong-van/${Date.now()}-${safeName}`;
 
   try {
-    const result = await upload(pathname, file, {
+    const result = await uploadPresigned(pathname, file, {
       access: 'private',
       handleUploadUrl: '/api/blob/upload',
     });
@@ -31,7 +31,8 @@ export async function uploadDocumentToBlob(file: File): Promise<BlobUploadOutcom
       blobPathname: result.pathname,
       storage: 'vercel_blob',
     };
-  } catch {
+  } catch (err) {
+    console.warn('Không thể tải lên Vercel Blob, dùng chế độ tạm cục bộ:', err);
     return {
       blobPathname: undefined,
       storage: 'local_only',
@@ -40,14 +41,15 @@ export async function uploadDocumentToBlob(file: File): Promise<BlobUploadOutcom
 }
 
 /**
- * Lấy Signed URL tạm thời (15 phút) từ /api/blob/view để hiển thị tệp Private Blob.
+ * Kiểm tra tệp tồn tại trên Private Blob và trả về URL proxy cùng domain để hiển thị trực tiếp trong iframe.
  */
 export async function getSignedDocumentViewUrl(blobPathname: string): Promise<string | null> {
+  const viewUrl = `/api/blob/view?pathname=${encodeURIComponent(blobPathname)}`;
   try {
-    const res = await fetch(`/api/blob/view?pathname=${encodeURIComponent(blobPathname)}`);
+    const res = await fetch(`${viewUrl}&check=1`);
     if (!res.ok) return null;
-    const data = (await res.json()) as { url?: string };
-    return data.url || null;
+    const data = (await res.json()) as { ok?: boolean };
+    return data.ok ? viewUrl : null;
   } catch {
     return null;
   }

@@ -1,33 +1,36 @@
-import { issueSignedToken, presignUrl } from '@vercel/blob';
+import { get, head } from '@vercel/blob';
 
 export async function GET(request: Request): Promise<Response> {
   try {
     const { searchParams } = new URL(request.url);
     const pathname = searchParams.get('pathname');
+    const checkOnly = searchParams.get('check') === '1';
 
     if (!pathname) {
       return Response.json({ error: 'Thiếu tham số pathname' }, { status: 400 });
     }
 
-    const validUntil = Date.now() + 15 * 60 * 1000; // 15 minutes
+    if (checkOnly) {
+      const meta = await head(pathname);
+      return Response.json({ ok: true, contentType: meta.contentType });
+    }
 
-    const token = await issueSignedToken({
-      pathname,
-      operations: ['get'],
-      validUntil,
+    const result = await get(pathname, { access: 'private' });
+    if (!result || result.statusCode !== 200 || !result.stream) {
+      return Response.json({ error: 'Không tìm thấy văn bản trên Vercel Blob' }, { status: 404 });
+    }
+
+    return new Response(result.stream, {
+      status: 200,
+      headers: {
+        'Content-Type': result.blob.contentType || 'application/pdf',
+        'Content-Disposition': 'inline',
+        'Cache-Control': 'private, max-age=300',
+      },
     });
-
-    const { presignedUrl } = await presignUrl(token, {
-      operation: 'get',
-      pathname,
-      access: 'private',
-      validUntil,
-    });
-
-    return Response.json({ url: presignedUrl });
   } catch (error) {
     return Response.json(
-      { error: (error as Error).message || 'Không thể tạo liên kết xem văn bản' },
+      { error: (error as Error).message || 'Không thể tải văn bản từ Vercel Blob' },
       { status: 500 }
     );
   }

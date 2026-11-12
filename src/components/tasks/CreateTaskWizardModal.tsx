@@ -149,6 +149,8 @@ export const CreateTaskWizardModal: React.FC<CreateTaskWizardModalProps> = ({ is
         setIsAnalyzing(false);
         if (blobOutcome.storage === 'vercel_blob') {
           showNotification('Đã tải văn bản lên Vercel Blob (Private) & phân tích xong!');
+        } else {
+          showNotification('Đã phân tích văn bản (chưa lưu được tệp gốc lên Vercel Blob).');
         }
       }, 1000);
     } catch {
