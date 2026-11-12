@@ -47,6 +47,15 @@ async function streamToBase64(stream: ReadableStream<Uint8Array>): Promise<strin
   return Buffer.from(merged).toString('base64');
 }
 
+function compactDocumentText(raw: string): string {
+  // Cắt bỏ phần Nơi nhận / Lưu VT ở cuối văn bản và gộp khoảng trắng thừa để giảm input token
+  const cleaned = raw
+    .replace(/\nNơi nhận\s*:[\s\S]*$/i, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+  return cleaned.slice(0, 12000);
+}
+
 export async function POST(request: Request): Promise<Response> {
   try {
     const user = await getSessionUser(request);
@@ -96,36 +105,29 @@ export async function POST(request: Request): Promise<Response> {
       );
     }
 
-    const prompt = `Bạn là trợ lý nghiệp vụ hành chính công cho cán bộ "${role}" thuộc "${department}", UBND "${communeName}".
-Hãy đọc kỹ văn bản hành chính đính kèm (tên tệp: "${fileName}") và bóc tách chính xác các thông tin & đầu việc cần thực hiện.
+    const compactText = compactDocumentText(text);
 
-QUY TẮC BẮT BUỘC:
-1. Chỉ trích xuất các thông tin và đầu việc CÓ THẬT trong văn bản, không tự bịa nội dung ngoài văn bản.
-2. Trong mục "actionPlan", hãy tập trung bóc tách các nhiệm vụ giao trực tiếp cho **UBND cấp xã / phường** hoặc **phòng ban chuyên môn cấp xã** (nếu văn bản chia mục cho tỉnh, sở, ngành, xã thì ưu tiên bóc tách cụ thể từng ý a, b, c... của mục giao cho UBND xã/phường).
-3. Mỗi mục trong "actionPlan" gồm:
-   - "step": số thứ tự (1, 2, 3...)
-   - "title": tên đầu việc ngắn gọn, rõ hành động (tối đa 90 ký tự)
-   - "desc": mô tả cụ thể nội dung cần làm theo văn bản
-   - "role": bộ phận/cán bộ thực hiện hoặc phối hợp (ví dụ: "${department}", "Công an xã", "Trường học trên địa bàn")
-4. "deadline": định dạng DD/MM/YYYY nếu văn bản nêu rõ ngày hết hạn; nếu văn bản chỉ ghi "định kỳ", "khẩn", hoặc không ghi ngày cụ thể thì trả về chuỗi rỗng "".
-5. "title": tên công việc tổng quát ngắn gọn, súc tích bằng tiếng Việt (tối đa 90 ký tự).
+    const prompt = `Trợ lý hành chính công cho "${role}" - "${department}", UBND "${communeName}". Tệp: "${fileName}".
+Trích xuất JSON thông tin và các đầu việc CÓ THẬT trong văn bản (không bịa thêm):
+- "actionPlan": ưu tiên bóc tách từng ý (a, b, c...) giao trực tiếp cho UBND cấp xã/phường hoặc phòng ban chuyên môn.
+- "title" & mỗi "actionPlan.title": ngắn gọn <= 90 ký tự.
+- "deadline": DD/MM/YYYY nếu có ngày cụ thể, không có thì "".
 
-NỘI DUNG VĂN BẢN:
-${text.slice(0, 30000)}`;
+VĂN BẢN:
+${compactText}`;
 
     parts.push({ text: prompt });
 
-    const model = process.env.GEMINI_MODEL || 'gemini-flash-latest';
+    const model = process.env.GEMINI_MODEL || 'gemini-flash-lite-latest';
     const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
 
-    const geminiRes = await fetch(endpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      signal: AbortSignal.timeout(25000),
-      body: JSON.stringify({
+    const requestBody = (includeThinkingConfig: boolean) =>
+      JSON.stringify({
         contents: [{ parts }],
         generationConfig: {
           temperature: 0.1,
+          maxOutputTokens: 1200,
+          ...(includeThinkingConfig ? { thinkingConfig: { thinkingBudget: 0 } } : {}),
           responseMimeType: 'application/json',
           responseSchema: {
             type: 'OBJECT',
@@ -159,8 +161,23 @@ ${text.slice(0, 30000)}`;
             required: ['code', 'issuedBy', 'title', 'summary', 'priority', 'type', 'requiredOutput', 'actionPlan'],
           },
         },
-      }),
+      });
+
+    let geminiRes = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      signal: AbortSignal.timeout(25000),
+      body: requestBody(true),
     });
+
+    if (geminiRes.status === 400) {
+      geminiRes = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        signal: AbortSignal.timeout(25000),
+        body: requestBody(false),
+      });
+    }
 
     if (!geminiRes.ok) {
       const errText = await geminiRes.text();
