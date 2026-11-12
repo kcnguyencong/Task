@@ -6,6 +6,7 @@ import { Sidebar } from './components/layout/Sidebar';
 import { TaskManagementScreen } from './components/tasks/TaskManagementScreen';
 import { AIWorkspaceScreen } from './components/workspace/AIWorkspaceScreen';
 import { LoginScreen } from './components/auth/LoginScreen';
+import { SettingsModal } from './components/settings/SettingsModal';
 
 export const App: React.FC = () => {
   const { currentTab, currentUser, authChecked, checkAuthSession } = useStore();
@@ -44,6 +45,8 @@ export const App: React.FC = () => {
           )}
         </main>
       </div>
+
+      <SettingsModal />
     </div>
   );
 };

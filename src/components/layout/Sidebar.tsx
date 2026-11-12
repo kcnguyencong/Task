@@ -18,7 +18,8 @@ export const Sidebar: React.FC = () => {
     setTab,
     taskFilterStatus,
     setTaskFilterStatus,
-    setTaskFilterType
+    setTaskFilterType,
+    setShowSettingsModal
   } = useStore();
 
   const navItems = [
@@ -132,12 +133,12 @@ export const Sidebar: React.FC = () => {
         </button>
 
         <button
-          onClick={() => alert("Cài đặt hệ thống: Đang kết nối mô hình xử lý văn bản cục bộ & chuẩn thể thức NĐ 30/2020/NĐ-CP.")}
-          className="w-[62px] py-2 px-1 rounded-xl flex flex-col items-center justify-center text-zinc-500 hover:text-zinc-200 hover:bg-white/5 transition-all group"
-          title="Cài đặt"
+          onClick={() => setShowSettingsModal(true)}
+          className="w-[62px] py-2 px-1 rounded-xl flex flex-col items-center justify-center text-zinc-500 hover:text-[#E5B54F] hover:bg-[#221C12] transition-all group cursor-pointer"
+          title="Cấu hình họ tên & đơn vị"
         >
-          <Settings className="w-4 h-4 text-zinc-400 group-hover:scale-110 transition-transform" />
-          <span className="text-[9px] font-medium mt-1 text-zinc-400">Cài đặt</span>
+          <Settings className="w-4 h-4 text-zinc-400 group-hover:text-[#E5B54F] group-hover:scale-110 transition-transform" />
+          <span className="text-[9px] font-medium mt-1 text-zinc-400 group-hover:text-[#E5B54F]">Cài đặt</span>
         </button>
 
         <button

@@ -6,6 +6,7 @@ import {
   loginWithPassword,
   registerAccount,
   logoutSession,
+  updateUserProfileInDb,
   fetchUserTasksFromDb,
   saveTaskToDb,
   deleteTaskFromDb,
@@ -34,9 +35,12 @@ interface AppState {
   updateLocality: (info: Partial<OrganizationInfo>) => void;
 
   // Auth Actions
+  showSettingsModal: boolean;
+  setShowSettingsModal: (open: boolean) => void;
   checkAuthSession: () => Promise<void>;
   login: (username: string, password: string) => Promise<string | null>;
   register: (payload: { username: string; password: string; fullName: string; communeName?: string }) => Promise<string | null>;
+  updateProfile: (payload: { fullName: string; communeName: string; department: string; role?: string }) => Promise<string | null>;
   logout: () => Promise<void>;
 
   // Actions
@@ -120,6 +124,8 @@ export const useStore = create<AppState>((set, get) => ({
   currentUser: null,
   authChecked: false,
   authLoading: false,
+  showSettingsModal: false,
+  setShowSettingsModal: (open) => set({ showSettingsModal: open }),
   currentTab: 'tasks',
   tasks: [],
   selectedTaskId: '',
@@ -199,6 +205,19 @@ export const useStore = create<AppState>((set, get) => ({
       locality: { ...state.locality, communeName: res.user!.commune_name || state.locality.communeName },
     }));
     get().showNotification(`Đã tạo tài khoản cho Đ/c ${res.user.full_name}!`);
+    return null;
+  },
+
+  updateProfile: async (payload) => {
+    const res = await updateUserProfileInDb(payload);
+    if (!res.user) {
+      return res.error || 'Không thể lưu cấu hình.';
+    }
+    set((state) => ({
+      currentUser: res.user!,
+      locality: { ...state.locality, communeName: res.user!.commune_name || state.locality.communeName },
+    }));
+    get().showNotification('Đã lưu cấu hình họ tên & đơn vị công tác!');
     return null;
   },
 

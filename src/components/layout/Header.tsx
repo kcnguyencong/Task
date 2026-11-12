@@ -18,7 +18,7 @@ function getInitials(fullName?: string): string {
 }
 
 export const Header: React.FC = () => {
-  const { notification, searchQuery, setSearchQuery, tasks, locality, currentUser, logout } = useStore();
+  const { notification, searchQuery, setSearchQuery, tasks, locality, currentUser, logout, setShowSettingsModal } = useStore();
 
   const missingCount = tasks.filter(t => t.missingIndicators.some(m => !m.isFilled)).length;
 
@@ -77,15 +77,22 @@ export const Header: React.FC = () => {
 
         {/* User Mini Tag & Logout */}
         <div className="flex items-center space-x-2 pl-2 border-l border-[#1E1E23]">
-          <div className="w-6 h-6 rounded-lg bg-[#241E15] border border-[#3E3219] text-[#E5B54F] flex items-center justify-center font-bold text-[10px]">
-            {getInitials(currentUser?.full_name)}
-          </div>
-          <span className="hidden lg:inline text-xs font-medium text-zinc-300">
-            {currentUser?.full_name || 'Cán bộ xã'}{' '}
-            <span className="text-[10px] text-zinc-500 font-normal">
-              ({currentUser?.role || 'Công chức VH-XH'})
+          <button
+            type="button"
+            onClick={() => setShowSettingsModal(true)}
+            className="flex items-center space-x-2 hover:bg-white/5 px-1.5 py-1 rounded-lg transition-colors cursor-pointer"
+            title="Cấu hình họ tên & đơn vị"
+          >
+            <div className="w-6 h-6 rounded-lg bg-[#241E15] border border-[#3E3219] text-[#E5B54F] flex items-center justify-center font-bold text-[10px]">
+              {getInitials(currentUser?.full_name)}
+            </div>
+            <span className="hidden lg:inline text-xs font-medium text-zinc-300">
+              {currentUser?.full_name || 'Cán bộ xã'}{' '}
+              <span className="text-[10px] text-zinc-500 font-normal">
+                ({currentUser?.role || 'Công chức VH-XH'})
+              </span>
             </span>
-          </span>
+          </button>
           <button
             type="button"
             onClick={() => void logout()}

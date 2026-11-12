@@ -67,17 +67,15 @@ export async function ensureSchema(): Promise<void> {
 
       await sql`CREATE INDEX IF NOT EXISTS idx_tasks_user_id ON tasks(user_id)`;
 
-      // Tạo tài khoản cán bộ mặc định nếu bảng users chưa có dữ liệu
-      const countRows = await sql`SELECT COUNT(*)::int AS total FROM users`;
-      const total = Number(countRows[0]?.total ?? 0);
-      if (total === 0) {
-        const defaultPasswordHash = hashPassword('123456');
-        await sql`
-          INSERT INTO users (username, password_hash, full_name, role, department, commune_name)
-          VALUES ('minhtv', ${defaultPasswordHash}, 'Trần Văn Minh', 'Công chức VH-XH', 'Phòng Văn hóa - Xã hội', 'Xã Dị Sử')
-          ON CONFLICT (username) DO NOTHING
-        `;
-      }
+      // Tạo tài khoản cán bộ mặc định nếu chưa có
+      const defaultPasswordHash = hashPassword('123456');
+      await sql`
+        INSERT INTO users (username, password_hash, full_name, role, department, commune_name)
+        VALUES
+          ('minhtv', ${defaultPasswordHash}, 'Trần Văn Minh', 'Công chức VH-XH', 'Phòng Văn hóa - Xã hội', 'Xã Dị Sử'),
+          ('dungvu', ${defaultPasswordHash}, 'Vũ Dũng', 'Công chức VH-XH', 'Phòng Văn hóa - Xã hội', 'Xã Dị Sử')
+        ON CONFLICT (username) DO NOTHING
+      `;
     })().catch((err) => {
       schemaInitPromise = null;
       throw err;

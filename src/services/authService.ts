@@ -71,6 +71,29 @@ export async function logoutSession(): Promise<void> {
   }
 }
 
+export async function updateUserProfileInDb(payload: {
+  fullName: string;
+  communeName: string;
+  department: string;
+  role?: string;
+}): Promise<{ user?: UserProfile; error?: string }> {
+  try {
+    const res = await fetch('/api/auth/profile', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify(payload),
+    });
+    const data = (await res.json()) as AuthResponse;
+    if (!res.ok || !data.user) {
+      return { error: data.error || 'Không thể lưu cấu hình tài khoản.' };
+    }
+    return { user: data.user };
+  } catch {
+    return { error: 'Không thể kết nối máy chủ để lưu cấu hình.' };
+  }
+}
+
 export async function fetchUserTasksFromDb(): Promise<Task[] | null> {
   try {
     const res = await fetch('/api/tasks', { credentials: 'include' });
