@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { Task, OfficialDocument, Indicator, CompletedReport, TaskType, TaskStatus, OrganizationInfo, UserProfile } from '../types';
-import { aiService, cleanVietnameseAdministrativeText } from '../services/aiService';
+import { aiService, cleanVietnameseAdministrativeText, type AnalyzeDocumentOptions } from '../services/aiService';
 import {
   fetchCurrentUser,
   loginWithPassword,
@@ -52,7 +52,7 @@ interface AppState {
   clearNotification: () => void;
 
   // Document Interpreter
-  runAnalyzeDocument: (docIdOrText: string, fileName?: string) => Promise<OfficialDocument>;
+  runAnalyzeDocument: (docIdOrText: string, fileName?: string, options?: AnalyzeDocumentOptions) => Promise<OfficialDocument>;
   confirmTaskFromDoc: (task: Partial<Task>, originalDoc: OfficialDocument) => Task;
 
   // Workspace Actions
@@ -227,10 +227,16 @@ export const useStore = create<AppState>((set, get) => ({
 
   clearNotification: () => set({ notification: null }),
 
-  runAnalyzeDocument: async (docIdOrText: string, fileName?: string) => {
+  runAnalyzeDocument: async (docIdOrText: string, fileName?: string, options?: AnalyzeDocumentOptions) => {
     set({ isAnalyzing: true });
     try {
-      const result = await aiService.analyzeDocument(docIdOrText, fileName);
+      const user = get().currentUser;
+      const result = await aiService.analyzeDocument(docIdOrText, fileName, {
+        communeName: user?.commune_name || get().locality.communeName,
+        department: user?.department,
+        role: user?.role,
+        ...options,
+      });
       set({ analyzedDoc: result, isAnalyzing: false });
       return result;
     } catch {

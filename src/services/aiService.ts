@@ -80,18 +80,111 @@ export function cleanVietnameseAdministrativeText(rawText: string): string {
   return text.trim();
 }
 
+export interface AnalyzeDocumentOptions {
+  blobPathname?: string;
+  communeName?: string;
+  department?: string;
+  role?: string;
+}
+
 export class AIService {
   /**
-   * Phân tích văn bản đến (Công văn / Kế hoạch / Quyết định) từ nội dung tệp thực tế hoặc dán vào
+   * Phân tích văn bản đến (Công văn / Kế hoạch / Quyết định) bằng Gemini AI (có fallback cục bộ)
    */
-  async analyzeDocument(docIdOrText: string, fileName?: string): Promise<OfficialDocument> {
-    // Giả lập độ trễ AI xử lý tự nhiên (600ms)
-    await new Promise(resolve => setTimeout(resolve, 600));
-
-    // Làm sạch toàn diện văn bản đầu vào (giữ nguyên toàn văn bản sạch cho cột xem văn bản gốc)
+  async analyzeDocument(
+    docIdOrText: string,
+    fileName?: string,
+    options?: AnalyzeDocumentOptions
+  ): Promise<OfficialDocument> {
     const rawContent = docIdOrText.trim();
     const fullText = fixVietnameseOcrText(rawContent);
     const content = cleanVietnameseAdministrativeText(rawContent);
+
+    // 1. Gọi Gemini API trên server để đọc hiểu & bóc tách đúng các đầu việc trong văn bản
+    try {
+      const res = await fetch('/api/ai/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          text: fullText,
+          fileName,
+          blobPathname: options?.blobPathname,
+          communeName: options?.communeName,
+          department: options?.department,
+          role: options?.role,
+        }),
+      });
+
+      if (res.ok) {
+        const data = (await res.json()) as {
+          analysis?: {
+            code?: string;
+            issuedBy?: string;
+            title?: string;
+            summary?: string;
+            deadline?: string;
+            priority?: 'urgent' | 'high' | 'normal';
+            type?: TaskType;
+            requiredOutput?: string;
+            requiredFiles?: string[];
+            actionPlan?: { step: number; title: string; desc: string; role?: string }[];
+          };
+        };
+
+        const ai = data.analysis;
+        if (ai && ai.title && Array.isArray(ai.actionPlan) && ai.actionPlan.length > 0) {
+          const code = (ai.code || 'VB-MỚI').trim();
+          const deadline = (ai.deadline || '').trim() || '30/11/2026';
+          const summary = (ai.summary || ai.title).trim();
+
+          return {
+            id: `doc-${Date.now()}`,
+            code,
+            title: ai.title.trim(),
+            issuedBy: (ai.issuedBy || 'Cơ quan cấp trên').trim(),
+            issueDate: new Date().toLocaleDateString('vi-VN'),
+            signer: 'Lãnh đạo đơn vị ban hành',
+            summary,
+            briefing: {
+              directiveContext: summary,
+              coreDemands: ai.actionPlan.map((a) => a.desc || a.title),
+              responsibleDepartments: Array.from(
+                new Set(ai.actionPlan.map((a) => a.role).filter(Boolean) as string[])
+              ),
+              estimatedWorkload: `${ai.actionPlan.length} đầu việc cần thực hiện`,
+            },
+            excerpt: content.length > 300 ? content.slice(0, 300) + '...' : content || summary,
+            fullContent: fullText || summary,
+            fileName,
+            requiredFiles: ai.requiredFiles || [],
+            actionPlan: ai.actionPlan.map((a, idx) => ({
+              step: a.step || idx + 1,
+              title: a.title,
+              desc: a.desc,
+              role: a.role,
+            })),
+            tasks: [
+              {
+                id: `task-${Date.now()}`,
+                code: `NV-${code.replace(/[^a-zA-Z0-9]/g, '').slice(-6) || '2026'}`,
+                title: ai.title.trim(),
+                description: summary,
+                type: ai.type || 'report',
+                deadline,
+                priority: ai.priority || 'high',
+                requiredOutput: ai.requiredOutput || 'Báo cáo / Kết quả thực hiện',
+              },
+            ],
+          };
+        }
+      }
+    } catch (err) {
+      console.warn('Gemini AI phân tích không khả dụng, dùng bộ tách cục bộ:', err);
+    }
+
+    // 2. Fallback cục bộ bằng quy tắc Regex nếu chưa gọi được API
+    await new Promise(resolve => setTimeout(resolve, 400));
     const cleanFileName = fileName ? fileName.replace(/\.[^/.]+$/, '').replace(/[_\\-]+/g, ' ').trim() : '';
 
     // 2. Trích xuất thông minh từ nội dung văn bản thực tế

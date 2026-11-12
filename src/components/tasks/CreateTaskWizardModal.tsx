@@ -115,10 +115,21 @@ export const CreateTaskWizardModal: React.FC<CreateTaskWizardModalProps> = ({ is
     }
 
     try {
-      const [doc, blobOutcome] = await Promise.all([
-        runAnalyzeDocument(query, fileName),
-        uploadDocumentToBlob(uploadedFile),
-      ]);
+      let doc;
+      let blobOutcome;
+
+      // Nếu PDF là bản scan (ít text), upload lên Blob trước để Gemini đọc trực tiếp tệp PDF
+      if (query.trim().length < 80) {
+        blobOutcome = await uploadDocumentToBlob(uploadedFile);
+        doc = await runAnalyzeDocument(query, fileName, {
+          blobPathname: blobOutcome.blobPathname,
+        });
+      } else {
+        [doc, blobOutcome] = await Promise.all([
+          runAnalyzeDocument(query, fileName),
+          uploadDocumentToBlob(uploadedFile),
+        ]);
+      }
 
       const isPdf = uploadedFile.type === 'application/pdf' || fileName.toLowerCase().endsWith('.pdf');
       doc.fileName = fileName;
@@ -128,31 +139,29 @@ export const CreateTaskWizardModal: React.FC<CreateTaskWizardModalProps> = ({ is
         doc.fileUrl = URL.createObjectURL(uploadedFile);
       }
 
-      setTimeout(() => {
-        setAnalyzedDoc(doc);
+      setAnalyzedDoc(doc);
 
-        if (doc.tasks && doc.tasks.length > 0) {
-          const firstTask = doc.tasks[0];
-          const cleanT = firstTask.title || doc.title;
-          setTaskTitle(cleanT);
-          setTaskType((firstTask.type as TaskType) || 'report');
-          setTaskDeadline(firstTask.deadline || '30/10/2026');
-          setTaskDesc(firstTask.description || doc.summary);
-          setTaskOutput(firstTask.requiredOutput || 'Kết quả thực hiện công việc');
-        } else {
-          setTaskTitle(doc.title);
-          setTaskDesc(doc.summary);
-          setTaskDeadline('30/10/2026');
-          setTaskOutput('Kết quả thực hiện công việc');
-        }
+      if (doc.tasks && doc.tasks.length > 0) {
+        const firstTask = doc.tasks[0];
+        const cleanT = firstTask.title || doc.title;
+        setTaskTitle(cleanT);
+        setTaskType((firstTask.type as TaskType) || 'report');
+        setTaskDeadline(firstTask.deadline || '30/11/2026');
+        setTaskDesc(firstTask.description || doc.summary);
+        setTaskOutput(firstTask.requiredOutput || 'Kết quả thực hiện công việc');
+      } else {
+        setTaskTitle(doc.title);
+        setTaskDesc(doc.summary);
+        setTaskDeadline('30/11/2026');
+        setTaskOutput('Kết quả thực hiện công việc');
+      }
 
-        setIsAnalyzing(false);
-        if (blobOutcome.storage === 'vercel_blob') {
-          showNotification('Đã tải văn bản lên Vercel Blob (Private) & phân tích xong!');
-        } else {
-          showNotification('Đã phân tích văn bản (chưa lưu được tệp gốc lên Vercel Blob).');
-        }
-      }, 1000);
+      setIsAnalyzing(false);
+      if (blobOutcome.storage === 'vercel_blob') {
+        showNotification('AI đã bóc tách công việc & lưu văn bản lên Vercel Blob!');
+      } else {
+        showNotification('AI đã bóc tách xong (chưa lưu được tệp gốc lên Vercel Blob).');
+      }
     } catch {
       setIsAnalyzing(false);
       showNotification('Lỗi khi phân tích văn bản');
