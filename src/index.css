@@ -1,0 +1,55 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-[#0c0c0e] text-zinc-100 antialiased font-sans;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    color-scheme: dark;
+  }
+}
+
+/* Custom dark scrollbars with amber/zinc accents */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #121215;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #2a2a30;
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #3f3f46;
+}
+
+/* Official A4 Document Paper canvas */
+.a4-document-paper {
+  font-family: 'Times New Roman', 'Liberation Serif', serif;
+  box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.08);
+  background-color: #ffffff;
+  color: #0f172a;
+}
+
+/* Dark mode A4 Document Paper canvas */
+.a4-document-paper-dark {
+  font-family: 'Times New Roman', 'Liberation Serif', serif;
+  box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.1);
+  background-color: #17171a;
+  color: #f1f5f9;
+}
+
+/* Red Seal Simulation (Dấu mộc đỏ điện tử) */
+.stamp-red-seal {
+  border: 2px dashed #DC2626;
+  color: #DC2626;
+  border-radius: 8px;
+  transform: rotate(-6deg);
+  opacity: 0.9;
+}
