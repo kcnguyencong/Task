@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   CheckCircle2,
   ArrowLeft,
@@ -8,10 +8,13 @@ import {
   Trash2,
   Check,
   Building2,
-  Eye
+  Eye,
+  Layers,
+  Paperclip
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { useStore } from '../../store/useStore';
+import { DocumentAttachment } from '../../types';
 import { fixVietnameseOcrText } from '../../services/aiService';
 import { getSignedDocumentViewUrl } from '../../services/blobService';
 
@@ -47,6 +50,31 @@ export const AIWorkspaceScreen: React.FC = () => {
 
   const currentTask = tasks.find(t => t.id === selectedTaskId) || tasks[0];
 
+  const attachments: DocumentAttachment[] = useMemo(() => {
+    if (!currentTask) return [];
+    if (currentTask.attachments && currentTask.attachments.length > 0) {
+      return currentTask.attachments;
+    }
+    if (currentTask.originalDoc?.fileName || currentTask.originalDoc?.title) {
+      return [
+        {
+          id: currentTask.originalDoc.id || 'doc-primary',
+          fileName:
+            currentTask.originalDoc.fileName ||
+            currentTask.originalDoc.title ||
+            'Văn bản gốc',
+          fileUrl: currentTask.originalDoc.fileUrl,
+          fileType: currentTask.originalDoc.fileType,
+          blobPathname: currentTask.originalDoc.blobPathname,
+          fullContent:
+            currentTask.originalDoc.fullContent || currentTask.originalDoc.excerpt,
+        },
+      ];
+    }
+    return [];
+  }, [currentTask]);
+
+  const [selectedAttachmentId, setSelectedAttachmentId] = useState<string>('');
   const [deadlineInput, setDeadlineInput] = useState<string>(currentTask?.deadline || '');
   const [newTaskItem, setNewTaskItem] = useState<string>('');
   const [docViewMode, setDocViewMode] = useState<'pdf' | 'text'>('pdf');
@@ -54,21 +82,30 @@ export const AIWorkspaceScreen: React.FC = () => {
   const [confirmDelete, setConfirmDelete] = useState<boolean>(false);
 
   useEffect(() => {
+    if (attachments.length > 0) {
+      setSelectedAttachmentId(attachments[0].id);
+    }
+  }, [currentTask?.id]);
+
+  const activeAttachment =
+    attachments.find((a) => a.id === selectedAttachmentId) || attachments[0];
+
+  useEffect(() => {
     let cancelled = false;
 
-    if (currentTask) {
-      setDeadlineInput(currentTask.deadline);
+    if (activeAttachment) {
+      setDeadlineInput(currentTask?.deadline || '');
       const isPdf =
-        currentTask.originalDoc.fileType === 'pdf' ||
-        currentTask.originalDoc.fileName?.toLowerCase().endsWith('.pdf');
+        activeAttachment.fileType === 'pdf' ||
+        activeAttachment.fileName?.toLowerCase().endsWith('.pdf');
 
-      if (currentTask.originalDoc.fileUrl) {
-        setResolvedPdfUrl(currentTask.originalDoc.fileUrl);
+      if (activeAttachment.fileUrl) {
+        setResolvedPdfUrl(activeAttachment.fileUrl);
         setDocViewMode('pdf');
-      } else if (isPdf && currentTask.originalDoc.blobPathname) {
+      } else if (isPdf && activeAttachment.blobPathname) {
         setResolvedPdfUrl(null);
         setDocViewMode('pdf');
-        getSignedDocumentViewUrl(currentTask.originalDoc.blobPathname).then((signedUrl) => {
+        getSignedDocumentViewUrl(activeAttachment.blobPathname).then((signedUrl) => {
           if (!cancelled) {
             if (signedUrl) {
               setResolvedPdfUrl(signedUrl);
@@ -86,7 +123,7 @@ export const AIWorkspaceScreen: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [currentTask?.id]);
+  }, [activeAttachment?.id, activeAttachment?.blobPathname, activeAttachment?.fileUrl]);
 
   if (!currentTask) {
     return (
@@ -113,6 +150,12 @@ export const AIWorkspaceScreen: React.FC = () => {
       matchedSourceDoc?.summary ||
       currentTask.originalDoc.excerpt ||
       ''
+  );
+
+  const currentAttachmentText = fixVietnameseOcrText(
+    activeAttachment?.fullContent ||
+      (activeAttachment?.id === attachments[0]?.id ? fullDocumentText : '') ||
+      'Chưa có nội dung văn bản trích xuất.'
   );
 
   const completedCount = currentTask.checklist.filter(c => c.status === 'completed').length;
@@ -418,7 +461,7 @@ export const AIWorkspaceScreen: React.FC = () => {
               <FileText className="w-4 h-4 text-[#E5B54F] shrink-0" />
               <div className="min-w-0">
                 <div className="text-xs font-bold text-white truncate">
-                  {currentTask.originalDoc.fileName || currentTask.originalDoc.title}
+                  {activeAttachment?.fileName || currentTask.originalDoc.fileName || currentTask.originalDoc.title}
                 </div>
                 <div className="text-[11px] text-zinc-400 flex items-center gap-2 truncate">
                   <span className="inline-flex items-center gap-1">
@@ -458,23 +501,59 @@ export const AIWorkspaceScreen: React.FC = () => {
             )}
           </div>
 
+          {/* TAB CHUYỂN ĐỔI TỆP (NẾU CÓ TỪ 2 TỆP TRỞ LÊN) */}
+          {attachments.length > 1 && (
+            <div className="bg-[#15151c] border-b border-[#242430] px-4 py-2 flex items-center gap-2 overflow-x-auto shrink-0">
+              <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider shrink-0 mr-1 flex items-center gap-1">
+                <Paperclip className="w-3 h-3 text-[#E5B54F]" />
+                <span>Tài liệu ({attachments.length}):</span>
+              </span>
+              {attachments.map((att, idx) => {
+                const isSelected = activeAttachment?.id === att.id;
+                const isPdf = att.fileType === 'pdf' || att.fileName.toLowerCase().endsWith('.pdf');
+                return (
+                  <button
+                    key={att.id || idx}
+                    type="button"
+                    onClick={() => setSelectedAttachmentId(att.id)}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-semibold flex items-center gap-2 shrink-0 transition-all cursor-pointer ${
+                      isSelected
+                        ? 'bg-[#252532] text-[#E5B54F] border border-[#3e3e52] shadow-xs'
+                        : 'bg-[#181820] text-zinc-400 hover:text-zinc-200 hover:bg-[#1f1f28] border border-transparent'
+                    }`}
+                  >
+                    {isPdf ? (
+                      <FileText className="w-3.5 h-3.5 text-red-400 shrink-0" />
+                    ) : (
+                      <Layers className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                    )}
+                    <span className="truncate max-w-[170px]">{att.fileName}</span>
+                    <span className="text-[10px] px-1.5 py-0.2 rounded bg-black/40 text-zinc-400 font-normal">
+                      {idx === 0 ? 'Văn bản chính' : `Phụ lục ${idx}`}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
           {/* Document Body */}
           <div className="flex-1 overflow-y-auto p-5 sm:p-6">
             {resolvedPdfUrl && docViewMode === 'pdf' ? (
               <iframe
                 src={resolvedPdfUrl}
-                title={currentTask.originalDoc.fileName || 'Văn bản đã tải lên'}
+                title={activeAttachment?.fileName || currentTask.originalDoc.fileName || 'Văn bản đã tải lên'}
                 className="w-full h-full min-h-[75vh] rounded-xl border border-[#262630] bg-white"
               />
             ) : (
               <div className="max-w-3xl mx-auto bg-white text-slate-900 rounded-xl shadow-2xl border border-zinc-700/30 px-8 py-9 sm:px-10 sm:py-10 font-serif">
                 <div className="pb-4 mb-5 border-b border-slate-200 flex items-center justify-between font-sans text-xs text-slate-500">
-                  <span>Văn bản: <strong className="text-slate-800">{currentTask.originalDoc.code}</strong></span>
+                  <span>Tài liệu: <strong className="text-slate-800">{activeAttachment?.fileName || currentTask.originalDoc.code}</strong></span>
                   <span>Ban hành: <strong className="text-slate-800">{currentTask.originalDoc.issuedBy}</strong></span>
                 </div>
 
                 <div className="text-[14px] leading-relaxed text-slate-800 whitespace-pre-wrap break-words select-text">
-                  {fullDocumentText || 'Chưa có nội dung văn bản.'}
+                  {currentAttachmentText}
                 </div>
               </div>
             )}

@@ -27,10 +27,16 @@ export const CreateTaskWizardModal: React.FC<CreateTaskWizardModalProps> = ({ is
 
   // Mode: upload document or direct input
   const [sourceType, setSourceType] = useState<'document' | 'direct'>('document');
-  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
-  const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
-  const [uploadedFileSize, setUploadedFileSize] = useState<string | null>(null);
-  const [extractedWordCount, setExtractedWordCount] = useState<number>(0);
+  interface UploadedFileInfo {
+    id: string;
+    file: File;
+    name: string;
+    sizeText: string;
+    sizeBytes: number;
+    wordCount: number;
+    extractedText: string;
+  }
+  const [uploadedFiles, setUploadedFiles] = useState<UploadedFileInfo[]>([]);
   const [isDragging, setIsDragging] = useState<boolean>(false);
 
   const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false);
@@ -48,39 +54,54 @@ export const CreateTaskWizardModal: React.FC<CreateTaskWizardModalProps> = ({ is
 
   if (!isOpen) return null;
 
-  // Process selected or dropped file
-  const processSelectedFile = async (file: File) => {
-    setUploadedFile(file);
-    setUploadedFileName(file.name);
-    setUploadedFileSize(`${(file.size / 1024).toFixed(1)} KB`);
-
-    try {
-      const text = await extractTextFromFile(file);
-      if (text && text.trim().length > 0) {
-        const words = text.trim().split(/\s+/).length;
-        setExtractedWordCount(words);
-      } else {
-        setExtractedWordCount(0);
+  // Process selected or dropped files
+  const processFiles = async (files: File[]) => {
+    if (!files || files.length === 0) return;
+    const newItems: UploadedFileInfo[] = [];
+    for (const file of files) {
+      let text = '';
+      let words = 0;
+      try {
+        text = (await extractTextFromFile(file)) || '';
+        if (text.trim().length > 0) {
+          words = text.trim().split(/\s+/).length;
+        }
+      } catch {
+        text = '';
+        words = 0;
       }
-    } catch {
-      setExtractedWordCount(0);
+      newItems.push({
+        id: `f-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+        file,
+        name: file.name,
+        sizeText: `${(file.size / 1024).toFixed(1)} KB`,
+        sizeBytes: file.size,
+        wordCount: words,
+        extractedText: text,
+      });
     }
+    setUploadedFiles((prev) => [...prev, ...newItems]);
   };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      await processSelectedFile(file);
+    const files = Array.from(e.target.files || []);
+    if (files.length > 0) {
+      await processFiles(files);
     }
+    e.target.value = '';
   };
 
   const handleDrop = async (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     setIsDragging(false);
-    const file = e.dataTransfer.files?.[0];
-    if (file) {
-      await processSelectedFile(file);
+    const files = Array.from(e.dataTransfer.files || []);
+    if (files.length > 0) {
+      await processFiles(files);
     }
+  };
+
+  const removeFile = (id: string) => {
+    setUploadedFiles((prev) => prev.filter((f) => f.id !== id));
   };
 
   // Quick suggestion titles for direct mode
@@ -93,8 +114,8 @@ export const CreateTaskWizardModal: React.FC<CreateTaskWizardModalProps> = ({ is
 
   // Run AI analysis with animated progression
   const handleRunAnalysis = async () => {
-    if (!uploadedFile) {
-      showNotification('Vui lòng chọn tệp văn bản (.pdf, .docx, .txt)');
+    if (uploadedFiles.length === 0) {
+      showNotification('Vui lòng chọn ít nhất một tệp văn bản (.pdf, .docx, .txt)');
       return;
     }
 
@@ -104,40 +125,64 @@ export const CreateTaskWizardModal: React.FC<CreateTaskWizardModalProps> = ({ is
     setTimeout(() => setAnalysisStep(2), 500);
     setTimeout(() => setAnalysisStep(3), 1000);
 
-    let query = '';
-    const fileName = uploadedFile.name;
+    const primaryFile = uploadedFiles[0];
+    const isMultiple = uploadedFiles.length > 1;
 
-    try {
-      const text = await extractTextFromFile(uploadedFile);
-      query = text || '';
-    } catch {
-      query = '';
+    let query = '';
+    if (isMultiple) {
+      query = uploadedFiles
+        .map((f, idx) => {
+          const roleLabel =
+            idx === 0
+              ? 'TÀI LIỆU CHÍNH (VĂN BẢN CHỈ ĐẠO)'
+              : `TÀI LIỆU KÈM THEO / PHỤ LỤC ${idx}`;
+          return `=== [${roleLabel}: ${f.name}] ===\n${f.extractedText || ''}`;
+        })
+        .join('\n\n');
+    } else {
+      query = primaryFile.extractedText || '';
     }
 
     try {
-      let doc;
-      let blobOutcome;
+      // 1. Tải tất cả các tệp lên Vercel Blob để lưu trữ
+      const uploadResults = await Promise.all(
+        uploadedFiles.map((f) => uploadDocumentToBlob(f.file))
+      );
 
-      // Nếu PDF là bản scan (ít text), upload lên Blob trước để Gemini đọc trực tiếp tệp PDF
-      if (query.trim().length < 80) {
-        blobOutcome = await uploadDocumentToBlob(uploadedFile);
-        doc = await runAnalyzeDocument(query, fileName, {
-          blobPathname: blobOutcome.blobPathname,
-        });
-      } else {
-        [doc, blobOutcome] = await Promise.all([
-          runAnalyzeDocument(query, fileName),
-          uploadDocumentToBlob(uploadedFile),
-        ]);
-      }
+      // Nếu chỉ có 1 file PDF scan (ít text trích xuất được), đọc qua Blob
+      const options =
+        primaryFile.extractedText.trim().length < 80 && uploadResults[0]?.blobPathname
+          ? { blobPathname: uploadResults[0].blobPathname }
+          : undefined;
 
-      const isPdf = uploadedFile.type === 'application/pdf' || fileName.toLowerCase().endsWith('.pdf');
-      doc.fileName = fileName;
-      doc.fileType = isPdf ? 'pdf' : fileName.split('.').pop()?.toLowerCase() || 'txt';
-      doc.blobPathname = blobOutcome.blobPathname;
-      if (isPdf) {
-        doc.fileUrl = URL.createObjectURL(uploadedFile);
+      const doc = await runAnalyzeDocument(query, primaryFile.name, options);
+
+      // 2. Gắn attachments vào doc
+      const attachments = uploadedFiles.map((f, idx) => {
+        const isPdf =
+          f.file.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf');
+        return {
+          id: `att-${Date.now()}-${idx + 1}`,
+          fileName: f.name,
+          fileType: isPdf ? 'pdf' : f.name.split('.').pop()?.toLowerCase() || 'txt',
+          fileUrl: isPdf ? URL.createObjectURL(f.file) : undefined,
+          blobPathname: uploadResults[idx]?.blobPathname,
+          fullContent: f.extractedText,
+          fileSize: f.sizeBytes,
+        };
+      });
+
+      const isPrimaryPdf =
+        primaryFile.file.type === 'application/pdf' ||
+        primaryFile.name.toLowerCase().endsWith('.pdf');
+
+      doc.fileName = primaryFile.name;
+      doc.fileType = isPrimaryPdf ? 'pdf' : primaryFile.name.split('.').pop()?.toLowerCase() || 'txt';
+      doc.blobPathname = uploadResults[0]?.blobPathname;
+      if (isPrimaryPdf) {
+        doc.fileUrl = URL.createObjectURL(primaryFile.file);
       }
+      doc.attachments = attachments;
 
       setAnalyzedDoc(doc);
 
@@ -157,11 +202,11 @@ export const CreateTaskWizardModal: React.FC<CreateTaskWizardModalProps> = ({ is
       }
 
       setIsAnalyzing(false);
-      if (blobOutcome.storage === 'vercel_blob') {
-        showNotification('AI đã bóc tách công việc & lưu văn bản lên Vercel Blob!');
-      } else {
-        showNotification('AI đã bóc tách xong (chưa lưu được tệp gốc lên Vercel Blob).');
-      }
+      showNotification(
+        isMultiple
+          ? `AI đã tổng hợp ${uploadedFiles.length} tài liệu (Văn bản chính & Phụ lục) thành công!`
+          : 'AI đã bóc tách công việc & lưu văn bản lên Vercel Blob!'
+      );
     } catch {
       setIsAnalyzing(false);
       showNotification('Lỗi khi phân tích văn bản');
@@ -252,59 +297,108 @@ export const CreateTaskWizardModal: React.FC<CreateTaskWizardModalProps> = ({ is
             </div>
           )}
 
-          {/* STEP 1: UPLOAD DOCUMENT */}
+          {/* STEP 1: UPLOAD DOCUMENTS (HỖ TRỢ NHIỀU FILE: VĂN BẢN CHÍNH + PHỤ LỤC) */}
           {sourceType === 'document' && !analyzedDoc && (
             <div className="space-y-4">
+              <input
+                type="file"
+                id="doc-upload"
+                accept=".pdf,.docx,.doc,.txt"
+                multiple
+                onChange={handleFileChange}
+                className="hidden"
+              />
+
               <div
                 onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
                 onDragLeave={() => setIsDragging(false)}
                 onDrop={handleDrop}
-                className={`border-2 border-dashed rounded-xl p-7 text-center bg-[#111114] transition-colors ${
+                className={`border-2 border-dashed rounded-xl p-6 text-center bg-[#111114] transition-colors ${
                   isDragging
                     ? 'border-[#D4AF37] bg-[#1a160f]'
                     : 'border-[#2b2b36] hover:border-[#D4AF37]/60'
                 }`}
               >
-                <input
-                  type="file"
-                  id="doc-upload"
-                  accept=".pdf,.docx,.doc,.txt"
-                  onChange={handleFileChange}
-                  className="hidden"
-                />
                 <label htmlFor="doc-upload" className="cursor-pointer block">
-                  <div className="w-10 h-10 rounded-xl bg-[#1C1C22] text-[#E5B54F] flex items-center justify-center mx-auto mb-3 border border-[#2d2d38]">
+                  <div className="w-10 h-10 rounded-xl bg-[#1C1C22] text-[#E5B54F] flex items-center justify-center mx-auto mb-2.5 border border-[#2d2d38]">
                     <Upload className="w-5 h-5" />
                   </div>
-                  {uploadedFileName ? (
-                    <div className="space-y-1.5">
-                      <div className="inline-flex items-center gap-2 bg-[#1b1b22] px-3 py-1.5 rounded-lg border border-[#2d2d38]">
-                        <FileText className="w-4 h-4 text-[#D4AF37]" />
-                        <span className="text-xs font-bold text-white">{uploadedFileName}</span>
-                        <span className="text-[10px] text-zinc-400">({uploadedFileSize})</span>
-                      </div>
-                      {extractedWordCount > 0 && (
-                        <p className="text-[11px] text-emerald-400 font-semibold flex items-center justify-center gap-1">
-                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                          <span>{extractedWordCount} từ</span>
-                        </p>
-                      )}
-                    </div>
-                  ) : (
-                    <div>
-                      <p className="text-xs font-bold text-zinc-200">
-                        Chọn hoặc kéo thả tệp văn bản (.pdf, .docx, .txt)
-                      </p>
-                    </div>
-                  )}
+                  <p className="text-xs font-bold text-zinc-200">
+                    Chọn hoặc kéo thả các tệp văn bản (.pdf, .docx, .txt)
+                  </p>
+                  <p className="text-[11px] text-zinc-400 mt-1">
+                    Hỗ trợ tải đồng thời <strong>Văn bản chỉ đạo</strong> và <strong>Phụ lục biểu mẫu số liệu</strong>
+                  </p>
                 </label>
               </div>
 
-              {/* Action trigger button */}
+              {/* Danh sách các file đã chọn */}
+              {uploadedFiles.length > 0 && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-[11px] text-zinc-400 font-semibold px-1">
+                    <span>Danh sách tài liệu đã chọn ({uploadedFiles.length})</span>
+                    <label htmlFor="doc-upload" className="text-[#E5B54F] hover:underline cursor-pointer flex items-center gap-1">
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>Đính kèm thêm tệp</span>
+                    </label>
+                  </div>
+
+                  <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+                    {uploadedFiles.map((item, idx) => (
+                      <div
+                        key={item.id}
+                        className="flex items-center justify-between p-2.5 bg-[#17171e] rounded-xl border border-[#2b2b36] text-xs"
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                          <div className="w-7 h-7 rounded-lg bg-[#20202c] flex items-center justify-center shrink-0">
+                            <FileText className={`w-4 h-4 ${idx === 0 ? 'text-[#E5B54F]' : 'text-blue-400'}`} />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-zinc-200 truncate">{item.name}</span>
+                              <span
+                                className={`text-[10px] px-1.5 py-0.2 rounded font-semibold shrink-0 ${
+                                  idx === 0
+                                    ? 'bg-[#E5B54F]/15 text-[#E5B54F] border border-[#E5B54F]/30'
+                                    : 'bg-blue-500/15 text-blue-300 border border-blue-500/30'
+                                }`}
+                              >
+                                {idx === 0 ? 'Văn bản chính' : `Phụ lục ${idx}`}
+                              </span>
+                            </div>
+                            <div className="text-[10px] text-zinc-500 flex items-center gap-2 mt-0.5">
+                              <span>{item.sizeText}</span>
+                              {item.wordCount > 0 && (
+                                <>
+                                  <span>•</span>
+                                  <span className="text-emerald-400 font-medium">
+                                    {item.wordCount.toLocaleString()} từ trích xuất
+                                  </span>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => removeFile(item.id)}
+                          className="p-1.5 text-zinc-500 hover:text-red-400 rounded-lg hover:bg-white/5 transition-colors cursor-pointer shrink-0 ml-2"
+                          title="Bỏ tệp này"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Nút kích hoạt phân tích */}
               <div className="pt-1 flex justify-end">
                 <button
                   type="button"
-                  disabled={isAnalyzing || !uploadedFile}
+                  disabled={isAnalyzing || uploadedFiles.length === 0}
                   onClick={handleRunAnalysis}
                   className="px-6 py-2.5 bg-[#C59B27] hover:bg-[#D4AF37] text-slate-950 rounded-xl text-xs font-bold shadow-md transition-all flex items-center gap-2 active:scale-95 disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
                 >
@@ -312,15 +406,19 @@ export const CreateTaskWizardModal: React.FC<CreateTaskWizardModalProps> = ({ is
                     <>
                       <Sparkles className="w-4 h-4 animate-spin text-slate-950" />
                       <span>
-                        {analysisStep === 1 && 'Đang đọc văn bản...'}
-                        {analysisStep === 2 && 'Đang bóc tách nhiệm vụ...'}
-                        {analysisStep === 3 && 'Đang lập kế hoạch...'}
+                        {analysisStep === 1 && 'Đang đọc các văn bản...'}
+                        {analysisStep === 2 && 'Đang bóc tách nhiệm vụ & phụ lục...'}
+                        {analysisStep === 3 && 'Đang lập kế hoạch hành động...'}
                       </span>
                     </>
                   ) : (
                     <>
                       <Sparkles className="w-4 h-4 text-slate-950" />
-                      <span>Phân tích văn bản</span>
+                      <span>
+                        {uploadedFiles.length > 1
+                          ? `Phân tích ${uploadedFiles.length} văn bản (Tổng hợp)`
+                          : 'Phân tích văn bản'}
+                      </span>
                     </>
                   )}
                 </button>
@@ -333,15 +431,22 @@ export const CreateTaskWizardModal: React.FC<CreateTaskWizardModalProps> = ({ is
             <div className="space-y-4 animate-in fade-in duration-200">
               {/* Badge: Căn cứ văn bản */}
               <div className="p-3 rounded-xl bg-[#1A1A22] border border-[#2B2B38] flex items-center justify-between text-xs">
-                <div className="flex items-center space-x-2">
-                  <FileCheck className="w-4 h-4 text-emerald-400" />
-                  <span className="text-zinc-300">
-                    <strong className="text-white">{analyzedDoc.code}</strong> · {analyzedDoc.issuedBy} ({analyzedDoc.issueDate})
-                  </span>
+                <div className="flex items-center space-x-2 min-w-0">
+                  <FileCheck className="w-4 h-4 text-emerald-400 shrink-0" />
+                  <div className="min-w-0">
+                    <span className="text-zinc-300">
+                      <strong className="text-white">{analyzedDoc.code}</strong> · {analyzedDoc.issuedBy} ({analyzedDoc.issueDate})
+                    </span>
+                    {analyzedDoc.attachments && analyzedDoc.attachments.length > 1 && (
+                      <div className="text-[11px] text-emerald-400 font-medium mt-0.5">
+                        Tổng hợp {analyzedDoc.attachments.length} tệp (Văn bản chỉ đạo + Phụ lục)
+                      </div>
+                    )}
+                  </div>
                 </div>
                 <button
                   onClick={() => { setAnalyzedDoc(null); setIsEditingForm(false); }}
-                  className="text-[11px] text-zinc-400 hover:text-white underline cursor-pointer"
+                  className="text-[11px] text-zinc-400 hover:text-white underline cursor-pointer shrink-0 ml-3"
                 >
                   Đổi tệp
                 </button>

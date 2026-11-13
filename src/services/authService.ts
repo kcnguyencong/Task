@@ -92,6 +92,10 @@ export async function saveTaskToDb(task: Task): Promise<void> {
           ? undefined
           : task.originalDoc.fileUrl,
       },
+      attachments: task.attachments?.map((att) => ({
+        ...att,
+        fileUrl: att.fileUrl?.startsWith('blob:') ? undefined : att.fileUrl,
+      })),
     };
     await fetch('/api/tasks', {
       method: 'POST',

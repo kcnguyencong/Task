@@ -48,12 +48,12 @@ async function streamToBase64(stream: ReadableStream<Uint8Array>): Promise<strin
 }
 
 function compactDocumentText(raw: string): string {
-  // Cắt bỏ phần Nơi nhận / Lưu VT ở cuối văn bản và gộp khoảng trắng thừa để giảm input token
+  // Gộp khoảng trắng thừa để tiết kiệm token mà không làm mất tài liệu đính kèm
   const cleaned = raw
-    .replace(/\nNơi nhận\s*:[\s\S]*$/i, '')
+    .replace(/[ \t]+/g, ' ')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
-  return cleaned.slice(0, 12000);
+  return cleaned.slice(0, 16000);
 }
 
 export async function POST(request: Request): Promise<Response> {
@@ -108,10 +108,12 @@ export async function POST(request: Request): Promise<Response> {
     const compactText = compactDocumentText(text);
 
     const prompt = `Trợ lý hành chính công cho "${role}" - "${department}", UBND "${communeName}". Tệp: "${fileName}".
-Trích xuất JSON thông tin và các đầu việc CÓ THẬT trong văn bản (không bịa thêm):
-- "actionPlan": ưu tiên bóc tách từng ý (a, b, c...) giao trực tiếp cho UBND cấp xã/phường hoặc phòng ban chuyên môn.
-- "title" & mỗi "actionPlan.title": ngắn gọn <= 90 ký tự.
+Nội dung có thể gồm Văn bản chỉ đạo chính và các Phụ lục / Biểu mẫu kèm theo.
+Trích xuất JSON thông tin và các việc CÓ THẬT trong văn bản (tuyệt đối không bịa):
+- "actionPlan": bóc tách từng ý giao trực tiếp cho UBND cấp xã/phường hoặc công chức chuyên môn thực hiện, bao gồm cả yêu cầu tổng hợp số liệu/báo cáo theo phụ lục đính kèm (nếu có).
+- "title" & mỗi "actionPlan.title": súc tích <= 90 ký tự.
 - "deadline": DD/MM/YYYY nếu có ngày cụ thể, không có thì "".
+- "requiredFiles": danh mục báo cáo, biểu mẫu số liệu, phụ lục cần nộp.
 
 VĂN BẢN:
 ${compactText}`;

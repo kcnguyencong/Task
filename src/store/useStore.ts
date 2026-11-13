@@ -329,6 +329,16 @@ export const useStore = create<AppState>((set, get) => ({
         fileType: originalDoc.fileType,
         blobPathname: originalDoc.blobPathname
       },
+      attachments: originalDoc.attachments && originalDoc.attachments.length > 0
+        ? originalDoc.attachments
+        : (originalDoc.fileName ? [{
+            id: `att-${Date.now()}-1`,
+            fileName: originalDoc.fileName,
+            fileUrl: originalDoc.fileUrl,
+            fileType: originalDoc.fileType,
+            blobPathname: originalDoc.blobPathname,
+            fullContent: originalDoc.fullContent || cleanExcerpt
+          }] : []),
       checklist: derivedChecklist,
       missingIndicators: [],
       sections: [],
@@ -753,6 +763,10 @@ useStore.subscribe((state) => {
           ...t.originalDoc,
           fileUrl: t.originalDoc.fileUrl?.startsWith('blob:') ? undefined : t.originalDoc.fileUrl,
         },
+        attachments: t.attachments?.map((att) => ({
+          ...att,
+          fileUrl: att.fileUrl?.startsWith('blob:') ? undefined : att.fileUrl,
+        })),
       }));
       localStorage.setItem(TASKS_STORAGE_KEY, JSON.stringify(serializableTasks));
     }

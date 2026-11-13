@@ -27,18 +27,31 @@ export async function DELETE(request: Request): Promise<Response> {
       LIMIT 1
     `;
 
-    const blobPathname = (
-      rows[0]?.data as { originalDoc?: { blobPathname?: string } } | undefined
-    )?.originalDoc?.blobPathname;
+    const taskData = rows[0]?.data as {
+      originalDoc?: { blobPathname?: string };
+      attachments?: Array<{ blobPathname?: string }>;
+    } | undefined;
+
+    const pathnamesToDelete = new Set<string>();
+    if (taskData?.originalDoc?.blobPathname) {
+      pathnamesToDelete.add(taskData.originalDoc.blobPathname);
+    }
+    if (Array.isArray(taskData?.attachments)) {
+      for (const att of taskData.attachments) {
+        if (att?.blobPathname) {
+          pathnamesToDelete.add(att.blobPathname);
+        }
+      }
+    }
 
     await sql`
       DELETE FROM tasks
       WHERE id = ${id} AND user_id = ${user.id}
     `;
 
-    if (blobPathname) {
+    for (const pathname of pathnamesToDelete) {
       try {
-        await del(blobPathname);
+        await del(pathname);
       } catch (blobErr) {
         console.warn('Không thể xóa tệp đính kèm trên Vercel Blob:', blobErr);
       }

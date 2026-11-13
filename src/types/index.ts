@@ -32,6 +32,16 @@ export interface ReportSection {
   sourceReferences: string[];
 }
 
+export interface DocumentAttachment {
+  id: string;
+  fileName: string;
+  fileUrl?: string;
+  fileType?: string;
+  blobPathname?: string;
+  fullContent?: string;
+  fileSize?: number;
+}
+
 export interface Task {
   id: string;
   code: string;
@@ -57,6 +67,7 @@ export interface Task {
     fileType?: string;
     blobPathname?: string;
   };
+  attachments?: DocumentAttachment[];
   checklist: ChecklistItem[];
   missingIndicators: MissingIndicator[];
   sections: ReportSection[];
@@ -87,6 +98,7 @@ export interface OfficialDocument {
   fileUrl?: string;
   fileType?: string;
   blobPathname?: string;
+  attachments?: DocumentAttachment[];
   tasks: Partial<Task>[];
   requiredFiles: string[];
   actionPlan: { step: number; title: string; desc: string; role?: string }[];
